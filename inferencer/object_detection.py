@@ -24,7 +24,7 @@ from inferencer.utils import get_offloading_region, get_offloading_image
 class Object_Detection:
     def __init__(self, config, type):
         self.type = type
-        if type == 'small infernece':
+        if type == 'small inference':
             self.model_name = config.samll_model_name
         else:
             self.model_name = config.large_model_name
