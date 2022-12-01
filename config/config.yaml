@@ -1,0 +1,12 @@
+video_path: ./video_data/road.mp4
+
+client:
+ samll_model_name: fasterrcnn_mobilenet_v3_large_fpn
+ diff_thresh: 0.005
+ local_queue_maxsize: 10
+ offloading_queue_maxsize: 10
+ frame_cache_maxsize: 100
+ fps: 30
+
+server:
+ large_model_name: fasterrcnn_resnet50_fpn

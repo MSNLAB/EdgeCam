@@ -1,7 +1,6 @@
+import argparse, yaml, munch
 import grpc
 from concurrent import futures
-from scipy.io._idl import AttrDict
-
 from tools.convert_tool import base64_to_cv2
 from grpc_server import message_transfer_pb2, message_transfer_pb2_grpc
 from inferencer.object_detection import Object_Detection
@@ -40,7 +39,13 @@ def start_server(config):
 
 
 if __name__ == '__main__':
-    config = AttrDict()
-    config.large_model_name = 'fasterrcnn_resnet50_fpn'
+    parser = argparse.ArgumentParser(description="configuration description")
+    parser.add_argument("--yaml_path", default="../config/config.yaml", help="input the path of *.yaml")
+    args = parser.parse_args()
+    with open(args.yaml_path, 'r') as f:
+        config = yaml.load(f, Loader=yaml.SafeLoader)
+        # provide class-like access for dict
+    config = munch.munchify(config)
+    server_config = config.server
 
-    start_server(config)
+    start_server(server_config)

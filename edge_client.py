@@ -1,9 +1,13 @@
 import time
-
 import cv2
-from scipy.io._idl import AttrDict
+import argparse
+import munch
+import yaml
+
 from edge.edge_worker import EdgeWorker
 from tools.video_processor import VideoProcessor
+from loguru import logger
+
 
 class Task:
     def __init__(self, task_index, frame, start_time):
@@ -33,33 +37,34 @@ class Task:
 
 
 if __name__ == '__main__':
-    config = AttrDict()
-    config.source_path = './video_data/road.mp4'
-    config.diff_thresh = 0.005
-    config.local_queue_maxsize = 10
-    config.offloading_queue_maxsize = 10
-    config.frame_cache_maxsize = 100
-    config.samll_model_name = 'fasterrcnn_mobilenet_v3_large_fpn'
-    config.large_model_name = 'fasterrcnn_resnet50_fpn'
-    config.fps = 30
+    parser = argparse.ArgumentParser(description="configuration description")
+    parser.add_argument("--yaml_path", default="./config/config.yaml", help="input the path of *.yaml")
+    args = parser.parse_args()
+    with open(args.yaml_path, 'r') as f:
+        config = yaml.load(f, Loader=yaml.SafeLoader)
+    #provide class-like access for dict
+    config = munch.munchify(config)
+    client_config = config.client
+    edge = EdgeWorker(client_config)
+    logger.add("log/client/client_{time}.log", level="INFO", rotation="500 MB")
 
-    edge = EdgeWorker(config)
-
-    with VideoProcessor(config.source_path) as video:
+    with VideoProcessor(config.video_path) as video:
         video_fps = video.fps
         index = 0
-        dur = int(video_fps / config.fps)
+        print(client_config.fps)
+        dur = int(video_fps / client_config.fps)
         while True:
             print(index)
             frame = next(video)
             if frame is None:
-                print("the video is over")
+                logger.info("the video finished")
                 break
             index += 1
             if index % dur == 0:
                 start_time = time.time()
                 task = Task(index, frame, start_time)
                 edge.frame_cache.put(task, block=True)
+                time.sleep(1/client_config.fps)
 
 
 
