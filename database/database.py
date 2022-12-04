@@ -1,9 +1,8 @@
-
 import time
-
 import mysql.connector
 from datetime import datetime
 from mysql.connector import errorcode
+from loguru import logger
 from scipy.io._idl import AttrDict
 
 
@@ -14,44 +13,46 @@ class DataBase:
         self.cursor = self.cnx.cursor()
         self.database_name = config.database_name
         self.tables = config.tables
-        self.add_data = config.add_data
+        self.inserts = config.inserts
 
     def _create_database(self):
         try:
             self.cursor.execute("CREATE DATABASE {}".format(self.database_name))
         except mysql.connector.Error as err:
-            print("Failed creating database: {}".format(err))
+            logger.error("Failed creating database: {}".format(err))
             exit(1)
 
     def use_database(self):
         try:
             self.cursor.execute("USE {}".format(self.database_name))
         except mysql.connector.Error as err:
-            print("Database {} does not exists.".format(self.database_name))
+            logger.error("Database {} does not exists.".format(self.database_name))
             if err.errno == errorcode.ER_BAD_DB_ERROR:
                 self._create_database()
-                print("Database {} created successfully.".format(self.database_name))
+                logger.success("Database {} created successfully.".format(self.database_name))
                 self.cnx.database = self.database_name
             else:
-                print(err)
+                logger.error(err)
                 exit(1)
 
     def create_tables(self):
         for table_name in self.tables:
             table_description = self.tables[table_name]
             try:
-                print("Creating table {}: ".format(table_name), end='')
+                logger.info("Creating table {}: ".format(table_name), end='')
                 self.cursor.execute(table_description)
             except mysql.connector.Error as err:
                 if err.errno == errorcode.ER_TABLE_EXISTS_ERROR:
-                    print("already exists.")
+                    self.cursor.execute("DELETE from {}".format(table_name))
+                    logger.info("already exists, clean it.")
                 else:
-                    print(err.msg)
+                    logger.error(err.msg)
             else:
-                print("create successfully")
+                logger.success("create successfully")
 
-    def insert_data(self, data):
-        self.cursor.execute(self.add_data)
+    def insert_data(self, table_name, data):
+        insert_sql = self.inserts[table_name]
+        self.cursor.execute(insert_sql, data)
         # Make sure data is committed to the database
         self.cnx.commit()
 
@@ -61,18 +62,18 @@ if __name__ == '__main__':
     config.connection = {'user': 'root', 'password': 'root', 'host': '127.0.0.1', 'raise_on_warnings': True}
     config.database_name = 'mydatabase'
     config.tables = {}
-    config.tables['record']= (
-    "CREATE TABLE `record` ("
+    config.tables['result']= (
+    "CREATE TABLE `result` ("
     " `index` int NOT NULL, "
-    " `start_time` timestamp ,"
-    " `end_time` timestamp ,"
+    " `start_time` timestamp(6) ,"
+    " `end_time` timestamp(6) ,"
     " `result` text, "
     " PRIMARY KEY(`index`)"
     ") ENGINE=InnoDB")
     config.add_data = (
         "INSERT INTO `record`"
         "(`index`, `start_time`, `end_time`, `result`) "
-        "VALUES ('1','2022-11-29 21:19:37','2022-11-29 21:19:48',' ')"
+        "VALUES (%s ,%s, %s, %s);"
     )
 
     res ={'boxes':
@@ -86,20 +87,14 @@ if __name__ == '__main__':
             [0.99056727, 0.98965424, 0.93990153, 0.9157755]
           }
 
-    data = {
-        'index': 1,
-        'start_time': datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'),
-        'end_time': datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'),
-        'result': str(res)
-    }
-
     data_str = (
-                '1', datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'),
+                4,
                 datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'),
-                'NULL'
+                datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'),
+                str(res)
                 )
     db = DataBase(config)
     db.use_database()
-    db.create_tables()
+    #db.create_tables()
     db.insert_data(data_str)
     pass

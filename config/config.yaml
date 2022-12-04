@@ -1,12 +1,27 @@
 video_path: ./video_data/road.mp4
 
 client:
- samll_model_name: fasterrcnn_mobilenet_v3_large_fpn
+ fps: 30
  diff_thresh: 0.005
  local_queue_maxsize: 10
  offloading_queue_maxsize: 10
  frame_cache_maxsize: 100
- fps: 30
+ samll_model_name: fasterrcnn_mobilenet_v3_large_fpn
+ server_url: 'localhost:50051'
+ #select the offloading policy
+ policy: threshold_offloading_policy
+ #change frame resolution using frame new height
+ new_height: 1080
+ #the quality of the transmitted frame
+ quality: 100
+ #database config
+ database:
+  connection: {'user': 'root', 'password': 'root', 'host': '127.0.0.1', 'raise_on_warnings': True}
+  database_name: 'mydatabase'
+  tables:
+   result: "CREATE TABLE `result` (`index` int NOT NULL, `start_time` timestamp(6) ,`end_time` timestamp(6) , `result` text, PRIMARY KEY(`index`))"
+  inserts:
+   result: "INSERT INTO `result` (`index`, `start_time`, `end_time`, `result`) VALUES (%s ,%s, %s, %s);"
 
 server:
  large_model_name: fasterrcnn_resnet50_fpn

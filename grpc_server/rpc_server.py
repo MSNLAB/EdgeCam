@@ -1,6 +1,11 @@
-import argparse, yaml, munch
+import argparse
+import yaml
+import munch
 import grpc
 from concurrent import futures
+
+from loguru import logger
+
 from tools.convert_tool import base64_to_cv2
 from grpc_server import message_transfer_pb2, message_transfer_pb2_grpc
 from inferencer.object_detection import Object_Detection
@@ -11,7 +16,6 @@ class MessageTransferServer(message_transfer_pb2_grpc.MessageTransferServicer):
         self.large_object_detection = Object_Detection(config, type='large inference')
 
     def image_processor(self, request, context):
-        print("rpc: {}".format(request))
         base64_frame = request.frame
         frame_shape = tuple(int(s) for s in request.frame_shape[1:-1].split(","))
         frame = base64_to_cv2(base64_frame).reshape(frame_shape)
@@ -29,12 +33,12 @@ class MessageTransferServer(message_transfer_pb2_grpc.MessageTransferServicer):
 
 
 def start_server(config):
-    print("starting the grpc server")
+    logger.info("grpc server is starting")
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
     message_transfer_pb2_grpc.add_MessageTransferServicer_to_server(MessageTransferServer(config), server)
     server.add_insecure_port('[::]:50051')
     server.start()
-    print("server start.")
+    logger.info("grpc server is listening")
     server.wait_for_termination()
 
 
@@ -44,7 +48,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     with open(args.yaml_path, 'r') as f:
         config = yaml.load(f, Loader=yaml.SafeLoader)
-        # provide class-like access for dict
+    # provide class-like access for dict
     config = munch.munchify(config)
     server_config = config.server
 

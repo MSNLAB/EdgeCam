@@ -32,6 +32,14 @@ class Task:
         self.detection_class.append(detection_class)
         self.detection_score.append(detection_score)
 
+    def get_result(self):
+        result_dict = {
+            'boxes': self.detection_boxes,
+            'class': self.detection_class,
+            'score': self.detection_score
+        }
+        return str(result_dict)
+
     def cal_accuracy(self):
         pass
 
@@ -51,7 +59,6 @@ if __name__ == '__main__':
     with VideoProcessor(config.video_path) as video:
         video_fps = video.fps
         index = 0
-        print(client_config.fps)
         dur = int(video_fps / client_config.fps)
         while True:
             print(index)
