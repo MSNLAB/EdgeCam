@@ -1,1 +1,1 @@
-# Semantic-Aware-Offloading
+# EdgeVision
