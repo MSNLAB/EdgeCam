@@ -1,27 +1,43 @@
-video_path: ./video_data/road.mp4
+video_path: ./video_data/p1080.mp4
 
 client:
  fps: 30
+ #the difference feature (pixel, edge, area, corner).
+ feature: edge
+ #the difference threshold
  diff_thresh: 0.005
+ #the queue maxsize
  local_queue_maxsize: 10
+ #Number of worker threads to offloading thread pool
+ offloading_max_worker: 3
  offloading_queue_maxsize: 10
  frame_cache_maxsize: 100
  samll_model_name: fasterrcnn_mobilenet_v3_large_fpn
- server_url: 'localhost:50051'
  #select the offloading policy
- policy: threshold_offloading_policy
+ policy: random_policy
  #change frame resolution using frame new height
  new_height: 1080
  #the quality of the transmitted frame
  quality: 100
- #database config
- database:
-  connection: {'user': 'root', 'password': 'root', 'host': '127.0.0.1', 'raise_on_warnings': True}
-  database_name: 'mydatabase'
-  tables:
-   result: "CREATE TABLE `result` (`index` int NOT NULL, `start_time` timestamp(6) ,`end_time` timestamp(6) , `result` text, PRIMARY KEY(`index`))"
-  inserts:
-   result: "INSERT INTO `result` (`index`, `start_time`, `end_time`, `result`) VALUES (%s ,%s, %s, %s);"
+ #server_ip
+ server_ip: 'localhost:50051'
+ #edge nodes
+ edge_id: 1
+ edge_num: 2
+ edges: ['127.0.0.1', '127.0.0.1']
 
 server:
+ server_id: 0
  large_model_name: fasterrcnn_resnet50_fpn
+ #the queue maxsize
+ local_queue_maxsize: 10
+
+#database config
+database:
+ connection: {'user': 'root', 'password': 'root', 'host': '127.0.0.1', 'raise_on_warnings': True}
+ database_name: 'mydatabase'
+ tables:
+   edge_result: "CREATE TABLE `result` (`index` int NOT NULL, `start_time` timestamp(6) ,`end_time` timestamp(6) , `result` text, PRIMARY KEY(`index`))"
+ inserts:
+   edge_result: "INSERT INTO `result` (`index`, `start_time`, `end_time`, `result`) VALUES (%s ,%s, %s, %s);"
+

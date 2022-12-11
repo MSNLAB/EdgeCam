@@ -1,4 +1,11 @@
 import argparse
+
+import threading
+import time
+
+import numpy as np
+from queue import Queue
+from datetime import datetime
 import yaml
 import munch
 import grpc
@@ -6,40 +13,86 @@ from concurrent import futures
 
 from loguru import logger
 
-from tools.convert_tool import base64_to_cv2
-from grpc_server import message_transfer_pb2, message_transfer_pb2_grpc
+from database.database import DataBase
+from edge_client import Task
 from inferencer.object_detection import Object_Detection
+from tools.convert_tool import base64_to_cv2
+from grpc_server import message_transmission_pb2, message_transmission_pb2_grpc
 
 
-class MessageTransferServer(message_transfer_pb2_grpc.MessageTransferServicer):
-    def __init__(self, config):
-        self.large_object_detection = Object_Detection(config, type='large inference')
+class MessageTransmissionServicer(message_transmission_pb2_grpc.MessageTransmissionServicer):
+    def __init__(self, local_queue, id):
+        self.local_queue = local_queue
+        self.id = id
 
-    def image_processor(self, request, context):
+    def task_processor(self, request, context):
         base64_frame = request.frame
-        frame_shape = tuple(int(s) for s in request.frame_shape[1:-1].split(","))
+        frame_shape = tuple(int(s) for s in request.new_shape[1:-1].split(","))
         frame = base64_to_cv2(base64_frame).reshape(frame_shape)
-        high_boxes, high_class, high_score = self.large_object_detection.large_inference(frame)
-        result_dict = {
-            'boxes': high_boxes,
-            'class': high_class,
-            'score': high_score,
-        }
-        reply = message_transfer_pb2.MessageReply(
-            result=str(result_dict),
-            frame_shape="",
+        raw_shape = tuple(int(s) for s in request.raw_shape[1:-1].split(","))
+
+        task = Task(request.source_edge_id, request.frame_index, frame, request.start_time, raw_shape)
+        if request.part_result != "":
+            part_result = eval(request.part_result)
+            task.add_result(part_result['boxes'], part_result['class'], part_result['score'])
+        self.local_queue.put(task, block=True)
+
+        reply = message_transmission_pb2.MessageReply(
+            destination_id=self.id,
+            local_length=self.local_queue.qsize(),
+            response='offload to {} successfully'.format(self.id)
         )
         return reply
 
 
-def start_server(config):
-    logger.info("grpc server is starting")
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
-    message_transfer_pb2_grpc.add_MessageTransferServicer_to_server(MessageTransferServer(config), server)
-    server.add_insecure_port('[::]:50051')
-    server.start()
-    logger.info("grpc server is listening")
-    server.wait_for_termination()
+class CloudServer:
+    def __init__(self, config):
+        self.config = config
+        self.server_id = config.server_id
+        self.large_object_detection = Object_Detection(config, type='large inference')
+
+        #create database and tables
+        self.database = DataBase(config.database)
+        self.database.use_database()
+        self.database.create_tables()
+
+        # start the thread for local process
+        self.local_queue = Queue(config.local_queue_maxsize)
+        self.local_processor = threading.Thread(target=self.cloud_local, )
+        self.local_processor.start()
+
+    def cloud_local(self):
+        while True:
+            task = self.local_queue.get(block=True)
+            frame = task.frame_cloud
+            high_boxes, high_class, high_score = self.large_object_detection.large_inference(frame)
+            # scale the small result
+            scale = task.raw_shape[0] / frame.shape[0]
+            high_boxes = (np.array(high_boxes) * scale).tolist()
+            task.add_result(high_boxes, high_class, high_score)
+
+            end_time = time.time()
+            task.set_end_time(end_time)
+            # upload the result to database
+            str_result = task.get_result()
+            in_data = (
+                task.frame_index,
+                datetime.fromtimestamp(float(task.start_time)).strftime('%Y-%m-%d %H:%M:%S.%f'),
+                datetime.fromtimestamp(task.end_time).strftime('%Y-%m-%d %H:%M:%S.%f'),
+                str_result,)
+            logger.debug(task.edge_id, in_data)
+            self.database.insert_data(table_name='edge_result{}'.format(task.edge_id), data=in_data)
+
+
+    def start_server(self):
+        logger.info("cloud server is starting")
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
+        message_transmission_pb2_grpc.add_MessageTransmissionServicer_to_server(
+            MessageTransmissionServicer(self.local_queue, self.server_id), server)
+        server.add_insecure_port('[::]:50051')
+        server.start()
+        logger.info("cloud server is listening")
+        server.wait_for_termination()
 
 
 if __name__ == '__main__':
@@ -51,5 +104,8 @@ if __name__ == '__main__':
     # provide class-like access for dict
     config = munch.munchify(config)
     server_config = config.server
+    database_config = config.database
+    server_config.update(database_config)
 
-    start_server(server_config)
+    cloud_server = CloudServer(server_config)
+    cloud_server.start_server()

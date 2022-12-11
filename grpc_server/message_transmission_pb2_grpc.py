@@ -2,10 +2,10 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-from grpc_server import message_transfer_pb2 as message__transfer__pb2
+import grpc_server.message_transmission_pb2 as message__transmission__pb2
 
 
-class MessageTransferStub(object):
+class MessageTransmissionStub(object):
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -14,42 +14,42 @@ class MessageTransferStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.image_processor = channel.unary_unary(
-                '/MessageTransfer/image_processor',
-                request_serializer=message__transfer__pb2.MessageRequest.SerializeToString,
-                response_deserializer=message__transfer__pb2.MessageReply.FromString,
+        self.task_processor = channel.unary_unary(
+                '/MessageTransmission/task_processor',
+                request_serializer=message__transmission__pb2.MessageRequest.SerializeToString,
+                response_deserializer=message__transmission__pb2.MessageReply.FromString,
                 )
 
 
-class MessageTransferServicer(object):
+class MessageTransmissionServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def image_processor(self, request, context):
+    def task_processor(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
 
-def add_MessageTransferServicer_to_server(servicer, server):
+def add_MessageTransmissionServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'image_processor': grpc.unary_unary_rpc_method_handler(
-                    servicer.image_processor,
-                    request_deserializer=message__transfer__pb2.MessageRequest.FromString,
-                    response_serializer=message__transfer__pb2.MessageReply.SerializeToString,
+            'task_processor': grpc.unary_unary_rpc_method_handler(
+                    servicer.task_processor,
+                    request_deserializer=message__transmission__pb2.MessageRequest.FromString,
+                    response_serializer=message__transmission__pb2.MessageReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'MessageTransfer', rpc_method_handlers)
+            'MessageTransmission', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
  # This class is part of an EXPERIMENTAL API.
-class MessageTransfer(object):
+class MessageTransmission(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def image_processor(request,
+    def task_processor(request,
             target,
             options=(),
             channel_credentials=None,
@@ -59,8 +59,8 @@ class MessageTransfer(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/MessageTransfer/image_processor',
-            message__transfer__pb2.MessageRequest.SerializeToString,
-            message__transfer__pb2.MessageReply.FromString,
+        return grpc.experimental.unary_unary(request, target, '/MessageTransmission/task_processor',
+            message__transmission__pb2.MessageRequest.SerializeToString,
+            message__transmission__pb2.MessageReply.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

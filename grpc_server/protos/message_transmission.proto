@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+service MessageTransmission {
+  rpc task_processor (MessageRequest) returns (MessageReply) {}
+}
+
+message MessageRequest {
+  int64 source_edge_id = 1;
+  int64 frame_index = 2;
+  string start_time = 3;
+  string frame = 4;
+  string part_result = 5;
+  string raw_shape = 6;
+  string new_shape = 7;
+}
+
+message MessageReply {
+    int64 destination_id = 1;
+    int64 local_length = 2;
+    string response = 3;
+}
