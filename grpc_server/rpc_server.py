@@ -81,7 +81,7 @@ class CloudServer:
                 datetime.fromtimestamp(task.end_time).strftime('%Y-%m-%d %H:%M:%S.%f'),
                 str_result,)
             logger.debug(task.edge_id, in_data)
-            self.database.insert_data(table_name='edge_result{}'.format(task.edge_id), data=in_data)
+            self.database.insert_data(table_name='edge{}'.format(task.edge_id), data=in_data)
 
 
     def start_server(self):

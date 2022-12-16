@@ -135,7 +135,7 @@ class EdgeWorker:
                         datetime.fromtimestamp(current_task.end_time).strftime('%Y-%m-%d %H:%M:%S.%f'),
                         str_result,)
                     logger.debug(current_task.edge_id, in_data)
-                    self.database.insert_data(table_name='edge_result{}'.format(current_task.edge_id), data=in_data)
+                    self.database.insert_data(table_name='edge{}'.format(current_task.edge_id), data=in_data)
             else:
                 logger.info('This frame has no objects detected')
 

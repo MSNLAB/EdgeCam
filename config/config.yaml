@@ -36,8 +36,7 @@ server:
 database:
  connection: {'user': 'root', 'password': 'root', 'host': '127.0.0.1', 'raise_on_warnings': True}
  database_name: 'mydatabase'
- tables:
-   edge_result: "CREATE TABLE `result` (`index` int NOT NULL, `start_time` timestamp(6) ,`end_time` timestamp(6) , `result` text, PRIMARY KEY(`index`))"
- inserts:
-   edge_result: "INSERT INTO `result` (`index`, `start_time`, `end_time`, `result`) VALUES (%s ,%s, %s, %s);"
+ tables: [edge1, edge2]
+ table_description: "CREATE TABLE `{}` (`index` int NOT NULL, `start_time` timestamp(6) ,`end_time` timestamp(6) , `result` text, PRIMARY KEY(`index`))"
+ insert_description: "INSERT INTO `{}` (`index`, `start_time`, `end_time`, `result`) VALUES (%s ,%s, %s, %s);"
 

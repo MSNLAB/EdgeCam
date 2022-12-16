@@ -13,7 +13,8 @@ class DataBase:
         self.cursor = self.cnx.cursor()
         self.database_name = config.database_name
         self.tables = config.tables
-        self.inserts = config.inserts
+        self.table_description = config.table_description
+        self.insert_description = config.insert_description
 
     def _create_database(self):
         try:
@@ -37,10 +38,10 @@ class DataBase:
 
     def create_tables(self):
         for table_name in self.tables:
-            table_description = self.tables[table_name]
+            table_description = self.table_description
             try:
                 logger.info("Creating table {}: ".format(table_name), end='')
-                self.cursor.execute(table_description)
+                self.cursor.execute(table_description.format(table_name))
             except mysql.connector.Error as err:
                 if err.errno == errorcode.ER_TABLE_EXISTS_ERROR:
                     self.cursor.execute("DELETE from {}".format(table_name))
@@ -51,7 +52,7 @@ class DataBase:
                 logger.success("create successfully")
 
     def insert_data(self, table_name, data):
-        insert_sql = self.inserts[table_name]
+        insert_sql = self.insert_description.format(table_name)
         self.cursor.execute(insert_sql, data)
         # Make sure data is committed to the database
         self.cnx.commit()
