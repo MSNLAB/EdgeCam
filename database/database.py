@@ -36,9 +36,10 @@ class DataBase:
                 logger.error(err)
                 exit(1)
 
-    def create_tables(self):
-        for table_name in self.tables:
-            table_description = self.table_description
+    def create_tables(self, edge_id=None):
+        table_description = self.table_description
+        if edge_id is not None:
+            table_name = self.tables[edge_id-1]
             try:
                 logger.info("Creating table {}: ".format(table_name), end='')
                 self.cursor.execute(table_description.format(table_name))
@@ -50,6 +51,19 @@ class DataBase:
                     logger.error(err.msg)
             else:
                 logger.success("create successfully")
+        else:
+            for table_name in self.tables:
+                try:
+                    logger.info("Creating table {}: ".format(table_name), end='')
+                    self.cursor.execute(table_description.format(table_name))
+                except mysql.connector.Error as err:
+                    if err.errno == errorcode.ER_TABLE_EXISTS_ERROR:
+                        self.cursor.execute("DELETE from {}".format(table_name))
+                        logger.info("already exists, clean it.")
+                    else:
+                        logger.error(err.msg)
+                else:
+                    logger.success("create successfully")
 
     def insert_data(self, table_name, data):
         insert_sql = self.insert_description.format(table_name)

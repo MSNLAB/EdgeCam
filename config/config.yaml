@@ -9,22 +9,22 @@ client:
  #the queue maxsize
  local_queue_maxsize: 10
  #Number of worker threads to offloading thread pool
- offloading_max_worker: 3
+ offloading_max_worker: 2
  offloading_queue_maxsize: 10
  frame_cache_maxsize: 100
  samll_model_name: fasterrcnn_mobilenet_v3_large_fpn
  #select the offloading policy
- policy: random_policy
+ policy: random policy
  #change frame resolution using frame new height
  new_height: 1080
  #the quality of the transmitted frame
  quality: 100
  #server_ip
- server_ip: 'localhost:50051'
+ server_ip: '3dm8816534.oicp.vip:50051'
  #edge nodes
  edge_id: 1
  edge_num: 2
- edges: ['127.0.0.1', '127.0.0.1']
+ edges: ['localhost:20416', 'localhost:20416']
 
 server:
  server_id: 0
@@ -37,6 +37,6 @@ database:
  connection: {'user': 'root', 'password': 'root', 'host': '127.0.0.1', 'raise_on_warnings': True}
  database_name: 'mydatabase'
  tables: [edge1, edge2]
- table_description: "CREATE TABLE `{}` (`index` int NOT NULL, `start_time` timestamp(6) ,`end_time` timestamp(6) , `result` text, PRIMARY KEY(`index`))"
+ table_description: "CREATE TABLE `{}` (`index` int NOT NULL, `start_time` timestamp(6) NOT NULL,`end_time` timestamp(6) NOT NULL, `result` text, PRIMARY KEY(`index`))"
  insert_description: "INSERT INTO `{}` (`index`, `start_time`, `end_time`, `result`) VALUES (%s ,%s, %s, %s);"
 

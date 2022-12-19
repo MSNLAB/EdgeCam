@@ -4,7 +4,6 @@ from concurrent import futures
 from datetime import datetime
 
 import random
-import cv2
 import grpc
 import numpy as np
 from queue import Queue
@@ -13,38 +12,11 @@ from loguru import logger
 from database.database import DataBase
 from difference.diff import DiffProcessor
 from grpc_server import message_transmission_pb2_grpc, message_transmission_pb2
-from grpc_server.rpc_server import MessageTransmissionServicer
+from rpc_server import MessageTransmissionServicer
 
 from tools.convert_tool import cv2_to_base64
 from tools.preprocess import frame_resize
 from inferencer.object_detection import Object_Detection
-
-
-class offloading_policy:
-    def __init__(self, policy_name, local_queue, offloading_executor):
-        self.policy_name = policy_name
-        self.local_queue = local_queue
-        self.offloading_executor = offloading_executor
-
-    def threshold_offloading_policy(self, task):
-        pass
-
-    def random_policy(self, task):
-        # 0: local, 1: offload to edge, 2: offload to cloud
-        policy = random.randint(0, 2)
-        if policy == 0:
-            self.local_queue.put(task, block=True)
-        elif policy == 1:
-            self.offloading_executor.submit()
-
-    def get_policy_method(self):
-        policy_dict = {
-            "threshold_offloading_policy": self.threshold_offloading_policy,
-            "random_policy": self.random_policy
-        }
-        if self.policy_name not in policy_dict:
-            logger.error("the policy name is error")
-        return policy_dict[self.policy_name]
 
 
 
@@ -59,15 +31,15 @@ class EdgeWorker:
         self.small_object_detection = Object_Detection(config, type='small inference')
 
         #create database and tables
-        self.database = DataBase(config.database)
+        self.database = DataBase(config)
         self.database.use_database()
-        self.database.create_tables()
+        self.database.create_tables(self.edge_id)
 
         self.frame_cache = Queue(config.frame_cache_maxsize)
         self.local_queue = Queue(config.local_queue_maxsize)
 
         #start the thread for edge server
-        self.edge_server = threading.Thread(target=self.start_edge_server(),)
+        self.edge_server = threading.Thread(target=self.start_edge_server,)
         self.edge_server.start()
         # start the thread for diff
         self.diff_processor = threading.Thread(target=self.diff_worker,)
@@ -134,7 +106,7 @@ class EdgeWorker:
                         datetime.fromtimestamp(current_task.start_time).strftime('%Y-%m-%d %H:%M:%S.%f'),
                         datetime.fromtimestamp(current_task.end_time).strftime('%Y-%m-%d %H:%M:%S.%f'),
                         str_result,)
-                    logger.debug(current_task.edge_id, in_data)
+                    logger.debug(str(current_task.edge_id) + str(in_data))
                     self.database.insert_data(table_name='edge{}'.format(current_task.edge_id), data=in_data)
             else:
                 logger.info('This frame has no objects detected')
@@ -146,40 +118,42 @@ class EdgeWorker:
             new_frame = frame_resize(frame_cloud, new_height=self.config.new_height)
             encoded_image = cv2_to_base64(new_frame, qp=self.config.quality)
             part_result_str = current_task.get_result()
-
             msg_request = message_transmission_pb2.MessageRequest(
-                source_edge_id=self.edge_id,
-                frame_index=current_task.frame_index,
-                start_time=current_task.start_time,
+                source_edge_id=int(self.edge_id),
+                frame_index=int(current_task.frame_index),
+                start_time=str(current_task.start_time),
                 frame=encoded_image,
                 part_result=part_result_str,
                 raw_shape=str(current_task.raw_shape),
-                new_shape=str(encoded_image.shape),
+                new_shape=str(new_frame.shape),
             )
             with grpc.insecure_channel(self.config.server_ip) as channel:
                 stub = message_transmission_pb2_grpc.MessageTransmissionStub(channel)
-                response = stub.task_processor(message_transmission_pb2.MessageRequest(msg_request))
+                res = stub.task_processor(msg_request)
+                logger.debug(str(res))
         else:
             frame_edge = current_task.frame_edge
             new_frame = frame_resize(frame_edge, new_height=self.config.new_height)
             encoded_image = cv2_to_base64(new_frame, qp=self.config.quality)
             msg_request = message_transmission_pb2.MessageRequest(
-                source_edge_id=self.edge_id,
-                frame_index=current_task.frame_index,
-                start_time=current_task.start_time,
+                source_edge_id=int(self.edge_id),
+                frame_index=int(current_task.frame_index),
+                start_time=str(current_task.start_time),
                 frame=encoded_image,
                 part_result="",
                 raw_shape=str(current_task.raw_shape),
-                new_shape=str(encoded_image.shape),
+                new_shape=str(new_frame.shape),
             )
             destination_edge_ip = self.config.edges[destination_edge]
             with grpc.insecure_channel(destination_edge_ip) as channel:
                 stub = message_transmission_pb2_grpc.MessageTransmissionStub(channel)
-                response = stub.task_processor(message_transmission_pb2.MessageRequest(msg_request))
+                res = stub.task_processor(msg_request)
+                logger.debug(str(res))
 
     def decision_worker(self, task):
         if self.config.policy == 'random policy':
             location = random.randint(0, 2)
+            logger.debug(location)
             if location == 0:
                 self.local_queue.put(task, block=True)
             elif location == 1:
@@ -201,7 +175,7 @@ class EdgeWorker:
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
         message_transmission_pb2_grpc.add_MessageTransmissionServicer_to_server(
             MessageTransmissionServicer(self.local_queue, self.edge_id), server)
-        server.add_insecure_port('[::]:50051')
+        server.add_insecure_port('[::]:20416')
         server.start()
         logger.success("edge {} server is listening".format(self.edge_id))
         server.wait_for_termination()
