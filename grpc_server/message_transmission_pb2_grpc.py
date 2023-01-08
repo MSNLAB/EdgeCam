@@ -19,12 +19,23 @@ class MessageTransmissionStub(object):
                 request_serializer=message__transmission__pb2.MessageRequest.SerializeToString,
                 response_deserializer=message__transmission__pb2.MessageReply.FromString,
                 )
+        self.get_queue_info = channel.unary_unary(
+                '/MessageTransmission/get_queue_info',
+                request_serializer=message__transmission__pb2.InfoRequest.SerializeToString,
+                response_deserializer=message__transmission__pb2.InfoReply.FromString,
+                )
 
 
 class MessageTransmissionServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def task_processor(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def get_queue_info(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -37,6 +48,11 @@ def add_MessageTransmissionServicer_to_server(servicer, server):
                     servicer.task_processor,
                     request_deserializer=message__transmission__pb2.MessageRequest.FromString,
                     response_serializer=message__transmission__pb2.MessageReply.SerializeToString,
+            ),
+            'get_queue_info': grpc.unary_unary_rpc_method_handler(
+                    servicer.get_queue_info,
+                    request_deserializer=message__transmission__pb2.InfoRequest.FromString,
+                    response_serializer=message__transmission__pb2.InfoReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -62,5 +78,22 @@ class MessageTransmission(object):
         return grpc.experimental.unary_unary(request, target, '/MessageTransmission/task_processor',
             message__transmission__pb2.MessageRequest.SerializeToString,
             message__transmission__pb2.MessageReply.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def get_queue_info(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/MessageTransmission/get_queue_info',
+            message__transmission__pb2.InfoRequest.SerializeToString,
+            message__transmission__pb2.InfoReply.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

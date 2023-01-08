@@ -12,12 +12,12 @@ from loguru import logger
 from database.database import DataBase
 from difference.diff import DiffProcessor
 from grpc_server import message_transmission_pb2_grpc, message_transmission_pb2
-from rpc_server import MessageTransmissionServicer
+from grpc_server.rpc_server import MessageTransmissionServicer
 
 from tools.convert_tool import cv2_to_base64
 from tools.preprocess import frame_resize
 from inferencer.object_detection import Object_Detection
-
+from apscheduler.schedulers.background import BackgroundScheduler
 
 
 
@@ -26,6 +26,9 @@ class EdgeWorker:
 
         self.config = config
         self.edge_id = config.edge_id
+        #queue info (id: length)
+        self.edge_num = self.config.edge_num
+        self.queue_info = {'{}'.format(i+1): 0 for i in range(self.edge_num)}
 
         self.edge_processor = DiffProcessor.str_to_class(config.feature)()
         self.small_object_detection = Object_Detection(config, type='small inference')
@@ -50,6 +53,10 @@ class EdgeWorker:
         # start the thread pool for offload
         self.offloading_executor = futures.ThreadPoolExecutor(max_workers=config.offloading_max_worker,)
 
+        #regularly update queue information
+        self.regular = BackgroundScheduler(daemon=True)
+        self.regular.add_job(self.update_regular, 'interval', seconds=int(self.config.regular))
+        self.regular.start()
 
     def diff_worker(self):
         diff = 1.0
@@ -91,7 +98,7 @@ class EdgeWorker:
                     current_task.add_result(detection_boxes, detection_class, detection_score)
 
                 # whether to further inference
-                if offloading_image is not None:
+                if offloading_image is not None and current_task.edge_process is False:
                     current_task.set_frame_cloud(offloading_image)
                     #offload to cloud for further inference
                     self.offloading_executor.submit(self.offload_worker, current_task)
@@ -130,7 +137,8 @@ class EdgeWorker:
             with grpc.insecure_channel(self.config.server_ip) as channel:
                 stub = message_transmission_pb2_grpc.MessageTransmissionStub(channel)
                 res = stub.task_processor(msg_request)
-                logger.debug(str(res))
+                logger.debug('id {}'.format(res.destination_id))
+                logger.debug('cloud_reply: ' + str(res))
         else:
             frame_edge = current_task.frame_edge
             new_frame = frame_resize(frame_edge, new_height=self.config.new_height)
@@ -148,34 +156,126 @@ class EdgeWorker:
             with grpc.insecure_channel(destination_edge_ip) as channel:
                 stub = message_transmission_pb2_grpc.MessageTransmissionStub(channel)
                 res = stub.task_processor(msg_request)
-                logger.debug(str(res))
-
-    def decision_worker(self, task):
-        if self.config.policy == 'random policy':
-            location = random.randint(0, 2)
-            logger.debug(location)
-            if location == 0:
-                self.local_queue.put(task, block=True)
-            elif location == 1:
-                #directly offload to cloud
-                task.set_frame_cloud(task.frame_edge)
-                self.offloading_executor.submit(self.offload_worker, task)
-            else:
-                #offload to another edge node
-                edge_num = self.config.edge_num
-                other_id_list = [i for i in range(edge_num) if i+1 != self.edge_id]
-                destination = random.choice(other_id_list)
-                self.offloading_executor.submit(self.offload_worker, task, destination_edge=destination)
-
-        else:
-            pass
+                logger.debug('edge_reply: ' + str(res))
 
     def start_edge_server(self):
         logger.info("edge {} server is starting".format(self.edge_id))
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
         message_transmission_pb2_grpc.add_MessageTransmissionServicer_to_server(
-            MessageTransmissionServicer(self.local_queue, self.edge_id), server)
-        server.add_insecure_port('[::]:20416')
+            MessageTransmissionServicer(self.local_queue, self.edge_id, self.queue_info), server)
+        server.add_insecure_port('[::]:50050')
         server.start()
         logger.success("edge {} server is listening".format(self.edge_id))
         server.wait_for_termination()
+
+    def update_regular(self):
+        for i in range(self.edge_num):
+            if i+1 == self.edge_id:
+                self.queue_info['{}'.format(self.edge_id)] = self.local_queue.qsize()
+            else:
+                logger.info("ok")
+                info_request = message_transmission_pb2.InfoRequest(
+                    source_edge_id=self.edge_id,
+                    local_length=self.local_queue.qsize(),
+                )
+                destination_edge_ip = self.config.edges[i]
+                with grpc.insecure_channel(destination_edge_ip) as channel:
+                    stub = message_transmission_pb2_grpc.MessageTransmissionStub(channel)
+                    res = stub.get_queue_info(info_request)
+                    logger.info(res)
+                    self.queue_info['{}'.format(res.destination_id)] = res.local_length
+
+        logger.info(self.queue_info)
+
+    def decision_worker(self, task):
+        policy = self.config.policy
+        self.queue_info['{}'.format(self.edge_id)] = self.local_queue.qsize()
+        logger.info('the offloading policy is {}'.format(policy))
+        if policy == 'Edge-Local':
+            task.edge_process = True
+            self.local_queue.put(task, block=True)
+
+        elif policy == 'Edge-Shortest':
+            shortest_id = min(self.queue_info, key=self.queue_info)
+            task.edge_process = True
+            if shortest_id == self.edge_id:
+                self.local_queue.put(task, block=True)
+            else:
+                self.offloading_executor.submit(self.offload_worker, task, destination_edge=shortest_id)
+
+        elif policy == 'Edge-Random':
+            edge_num = self.config.edge_num
+            id_list = [i for i in range(edge_num)]
+            destination = random.choice(id_list)
+            task.edge_process = True
+            if destination == self.edge_id:
+                self.local_queue.put(task, block=True)
+            else:
+                self.offloading_executor.submit(self.offload_worker, task, destination_edge=destination)
+
+        elif policy == 'Edge-Cloud-Only':
+            self.local_queue.put(task, block=True)
+
+        elif policy =='Edge-Cloud-Threshold':
+            queue_thresh = self.config.queue_thresh
+            if self.local_queue.qsize() <= queue_thresh:
+                self.local_queue.put(task, block=True)
+            else:
+                task.set_frame_cloud(task.frame_edge)
+                self.offloading_executor.submit(self.offload_worker, task)
+
+        elif policy == 'Edge-Cloud-Random':
+            location = random.randint(0, 1)
+            if location == 0:
+                self.local_queue.put(task, block=True)
+            else:
+                # directly offload to cloud
+                task.set_frame_cloud(task.frame_edge)
+                self.offloading_executor.submit(self.offload_worker, task)
+
+        elif policy == 'Shortest-Queue-Only':
+            shortest_id = min(self.queue_info, key=self.queue_info)
+            if shortest_id == self.edge_id:
+                self.local_queue.put(task, block=True)
+            else:
+                self.offloading_executor.submit(self.offload_worker, task, destination_edge=shortest_id)
+
+        elif policy == 'Shortest-Queue-Threshold':
+            queue_thresh = self.config.queue_thresh
+            shortest_info = min(zip(self.queue_info.values(), self.queue_info.keys()))
+            shortest_length = shortest_info[0]
+            shortest_id = shortest_info[1]
+            if shortest_length > queue_thresh:
+                task.set_frame_cloud(task.frame_edge)
+                self.offloading_executor.submit(self.offload_worker, task)
+            elif shortest_id == self.edge_id:
+                self.local_queue.put(task, block=True)
+            else:
+                self.offloading_executor.submit(self.offload_worker, task, destination_edge=shortest_id)
+
+        elif policy == 'Random-Only':
+            edge_num = self.config.edge_num
+            id_list = [i for i in range(edge_num)]
+            destination = random.choice(id_list)
+            if destination == self.edge_id:
+                self.local_queue.put(task, block=True)
+            else:
+                self.offloading_executor.submit(self.offload_worker, task, destination_edge=destination)
+
+        elif policy == 'Random-Threshold':
+            queue_thresh = self.config.queue_thresh
+            edge_num = self.config.edge_num
+            id_list = [i for i in range(edge_num)]
+            destination = random.choice(id_list)
+            des_len = self.queue_info['{}'.format(destination)]
+            if des_len > queue_thresh:
+                task.set_frame_cloud(task.frame_edge)
+                self.offloading_executor.submit(self.offload_worker, task)
+            elif destination == self.edge_id:
+                self.local_queue.put(task, block=True)
+            else:
+                self.offloading_executor.submit(self.offload_worker, task, destination_edge=destination)
+
+        else:
+            logger.error('the policy does not exist.')
+

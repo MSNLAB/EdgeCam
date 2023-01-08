@@ -14,40 +14,10 @@ from concurrent import futures
 
 from loguru import logger
 from database.database import DataBase
-from edge.task import Task
+from grpc_server.rpc_server import MessageTransmissionServicer
 
 from inferencer.object_detection import Object_Detection
-from tools.convert_tool import base64_to_cv2
 from grpc_server import message_transmission_pb2, message_transmission_pb2_grpc
-
-
-class MessageTransmissionServicer(message_transmission_pb2_grpc.MessageTransmissionServicer):
-    def __init__(self, local_queue, id):
-        self.local_queue = local_queue
-        self.id = id
-
-    def task_processor(self, request, context):
-
-        base64_frame = request.frame
-        frame_shape = tuple(int(s) for s in request.new_shape[1:-1].split(","))
-        frame = base64_to_cv2(base64_frame).reshape(frame_shape)
-        raw_shape = tuple(int(s) for s in request.raw_shape[1:-1].split(","))
-
-
-
-        task = Task(request.source_edge_id, request.frame_index, frame, request.start_time, raw_shape)
-        if request.part_result != "":
-            part_result = eval(request.part_result)
-            task.add_result(part_result['boxes'], part_result['class'], part_result['score'])
-        self.local_queue.put(task, block=True)
-
-        reply = message_transmission_pb2.MessageReply(
-            destination_id=self.id,
-            local_length=self.local_queue.qsize(),
-            response='offload to {} successfully'.format(self.id)
-        )
-
-        return reply
 
 
 class CloudServer:
@@ -74,8 +44,9 @@ class CloudServer:
             high_boxes, high_class, high_score = self.large_object_detection.large_inference(frame)
             # scale the small result
             scale = task.raw_shape[0] / frame.shape[0]
-            high_boxes = (np.array(high_boxes) * scale).tolist()
-            task.add_result(high_boxes, high_class, high_score)
+            if high_boxes:
+                high_boxes = (np.array(high_boxes) * scale).tolist()
+                task.add_result(high_boxes, high_class, high_score)
 
             end_time = time.time()
             task.set_end_time(end_time)

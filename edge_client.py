@@ -27,21 +27,25 @@ if __name__ == '__main__':
     edge = EdgeWorker(client_config)
     logger.add("log/client/client_{time}.log", level="INFO", rotation="500 MB")
 
-    with VideoProcessor(config.video_path) as video:
+    with VideoProcessor(config.source) as video:
         video_fps = video.fps
+        logger.info("the video fps is {}".format(video_fps))
         index = 0
-        dur = round(video_fps / client_config.fps)
+        interval = client_config.interval
+        if interval == 0:
+            logger.error("the interval error")
+        logger.info("Take the frame interval is {}".format(interval))
         while True:
             frame = next(video)
             if frame is None:
                 logger.info("the video finished")
                 break
             index += 1
-            if index % dur == 0:
+            if index % interval == 0:
                 start_time = time.time()
                 task = Task(client_config.edge_id, index, frame, start_time, frame.shape)
                 edge.frame_cache.put(task, block=True)
-                time.sleep(1/client_config.fps)
+                time.sleep(interval/video_fps)
 
 
 

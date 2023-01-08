@@ -12,6 +12,7 @@ class Task:
         self.accuracy = None
         self.frame_cloud = None
         self.received = False
+        self.edge_process = False
         self.detection_boxes = []
         self.detection_class = []
         self.detection_score = []

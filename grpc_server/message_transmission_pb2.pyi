@@ -4,6 +4,22 @@ from typing import ClassVar as _ClassVar, Optional as _Optional
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class InfoReply(_message.Message):
+    __slots__ = ["destination_id", "local_length"]
+    DESTINATION_ID_FIELD_NUMBER: _ClassVar[int]
+    LOCAL_LENGTH_FIELD_NUMBER: _ClassVar[int]
+    destination_id: int
+    local_length: int
+    def __init__(self, destination_id: _Optional[int] = ..., local_length: _Optional[int] = ...) -> None: ...
+
+class InfoRequest(_message.Message):
+    __slots__ = ["local_length", "source_edge_id"]
+    LOCAL_LENGTH_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_EDGE_ID_FIELD_NUMBER: _ClassVar[int]
+    local_length: int
+    source_edge_id: int
+    def __init__(self, source_edge_id: _Optional[int] = ..., local_length: _Optional[int] = ...) -> None: ...
+
 class MessageReply(_message.Message):
     __slots__ = ["destination_id", "local_length", "response"]
     DESTINATION_ID_FIELD_NUMBER: _ClassVar[int]

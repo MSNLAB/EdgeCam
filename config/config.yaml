@@ -1,30 +1,41 @@
-video_path: ./video_data/p1080.mp4
+source:
+ video_path: ./video_data/road.mp4
+ rtsp:
+  label: False
+  account: your account
+  password: your password
+  ip_address: you camera ip
+  channel: 1
 
 client:
- fps: 30
+ #the frame interval
+ interval: 1
  #the difference feature (pixel, edge, area, corner).
  feature: edge
  #the difference threshold
  diff_thresh: 0.005
  #the queue maxsize
  local_queue_maxsize: 10
+ #the queue threshold for offloading
+ queue_thresh: 5
  #Number of worker threads to offloading thread pool
  offloading_max_worker: 2
- offloading_queue_maxsize: 10
  frame_cache_maxsize: 100
+ #regularly update queue info (second)
+ regular: 10
  samll_model_name: fasterrcnn_mobilenet_v3_large_fpn
  #select the offloading policy
- policy: random policy
+ policy: Edge-Cloud-Threshold
  #change frame resolution using frame new height
  new_height: 1080
  #the quality of the transmitted frame
  quality: 100
  #server_ip
- server_ip: '3dm8816534.oicp.vip:50051'
+ server_ip: '127.0.0.1:50051'
  #edge nodes
  edge_id: 1
  edge_num: 2
- edges: ['localhost:20416', 'localhost:20416']
+ edges: ['localhost:50050', 'localhost:50050']
 
 server:
  server_id: 0
