@@ -19,13 +19,11 @@ from inferencer.utils import get_offloading_region, get_offloading_image
 5. 最后将大模型得到的结果与之前的结果进行合并
 """
 
-
-
 class Object_Detection:
     def __init__(self, config, type):
         self.type = type
         if type == 'small inference':
-            self.model_name = config.samll_model_name
+            self.model_name = config.small_model_name
         else:
             self.model_name = config.large_model_name
         self.model = self.load_model()
@@ -48,10 +46,9 @@ class Object_Detection:
             return None
 
     def small_inference(self, img):
-        flag = 'offloading'
         pred_boxes, pred_class, pred_score = self.get_model_prediction(img, self.threshold_low)
         if pred_boxes == None:
-            flag = 'object not exist'
+            return 'object not detected'
         #filter high confidence region as the detection result
         prediction_index = [pred_score.index(x) for x in pred_score if x > self.threshold_high][-1]
         detection_boxes = pred_boxes[:prediction_index + 1]
@@ -63,10 +60,11 @@ class Object_Detection:
         #get the inferencer that need to query
         offloading_region = get_offloading_region(high_detections, low_regions, img.shape)
         if len(offloading_region) == 0:
-            flag = 'offloading region not exist'
-        offloading_image = get_offloading_image(offloading_region, img)
+            offloading_image = None
+        else:
+            offloading_image = get_offloading_image(offloading_region, img)
 
-        return flag, offloading_image, detection_boxes, detection_class, detection_score
+        return offloading_image, detection_boxes, detection_class, detection_score
 
 
     def large_inference(self, img):

@@ -67,6 +67,8 @@ class DataBase:
 
     def insert_data(self, table_name, data):
         insert_sql = self.insert_description.format(table_name)
+        logger.debug(insert_sql)
+        logger.debug("data {}".format(data))
         self.cursor.execute(insert_sql, data)
         # Make sure data is committed to the database
         self.cnx.commit()

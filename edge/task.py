@@ -9,9 +9,9 @@ class Task:
         self.start_time = start_time
         self.raw_shape = raw_shape
         self.end_time = None
-        self.accuracy = None
         self.frame_cloud = None
-        self.received = False
+        self.other = False
+        self.directly_cloud = False
         self.edge_process = False
         self.detection_boxes = []
         self.detection_class = []
@@ -37,6 +37,3 @@ class Task:
             'score': self.detection_score
         }
         return str(result_dict)
-
-    def cal_accuracy(self):
-        pass

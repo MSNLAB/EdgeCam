@@ -59,6 +59,7 @@ class CloudServer:
                 str_result,)
             logger.debug(str(task.edge_id) + str(in_data))
             self.database.insert_data(table_name='edge{}'.format(task.edge_id), data=in_data)
+            logger.debug('ok')
 
 
     def start_server(self):

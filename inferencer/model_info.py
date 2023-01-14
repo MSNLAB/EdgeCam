@@ -5,6 +5,8 @@ model_lib = {
     'fasterrcnn_mobilenet_v3_large_fpn': {
         'model_path': 'fasterrcnn_mobilenet_v3_large_fpn-fb6a3cc7.pth',
     },
+    'fasterrcnn_mobilenet_v3_large_320_fpn': {
+        'model_path': 'fasterrcnn_mobilenet_v3_large_320_fpn-907ea3f9.pth',}
 }
 
 

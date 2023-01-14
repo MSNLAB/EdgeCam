@@ -23,13 +23,29 @@ client:
  frame_cache_maxsize: 100
  #regularly update queue info (second)
  regular: 10
- samll_model_name: fasterrcnn_mobilenet_v3_large_fpn
+ small_model_name: fasterrcnn_mobilenet_v3_large_320_fpn
  #select the offloading policy
  policy: Edge-Cloud-Threshold
  #change frame resolution using frame new height
- new_height: 1080
+ new_height:
+  #offload to another edge node [1080, 720], default 720
+  another: 720
+  #option to offload directly to the cloud [1080, 720, 480], default 480
+  directly_cloud: 480
+  #offload to the cloud after local inference [1080, 720, 480], default 720
+  local_cloud: 720
+  #The task from another edge node is offloaded to the cloud after local inference [720, 480], default 720
+  another_cloud: 720
  #the quality of the transmitted frame
- quality: 100
+ quality:
+  #offload to another edge node [95, 85], default 85
+  another: 85
+  #Option to offload directly to the cloud [85, 95], default 85
+  directly_cloud: 85
+  #offload to the cloud after local inference [85, 95], default 95
+  local_cloud: 95
+  #The task from another edge node is offloaded to the cloud after local inference, default 85.
+  another_cloud: 85
  #server_ip
  server_ip: '127.0.0.1:50051'
  #edge nodes
@@ -39,7 +55,7 @@ client:
 
 server:
  server_id: 0
- large_model_name: fasterrcnn_resnet50_fpn
+ large_model_name: fasterrcnn_mobilenet_v3_large_fpn
  #the queue maxsize
  local_queue_maxsize: 10
 

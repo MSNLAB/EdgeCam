@@ -1,0 +1,26 @@
+1. install -i https://pypi.tuna.tsinghua.edu.cn/simple/
+https://forums.developer.nvidia.com/t/pytorch-for-jetson/72048
+jetson torch, torchvision
+
+pip3 install munch
+pip3 install grpcio
+pip3 install grpcio-tools
+pip3 install loguru
+pip3 install mysql-connector-python
+pip3 install mapcalc
+pip3 install APScheduler
+
+
+2. grpc server
+(1)3.19.6 protof no builder
+复制builder.py到.../Lib/site-packages/google/protobuf/internal您计算机上的另一个文件夹
+
+3. mysql
+(1) install
+sudo apt install mysql-server
+(2) password
+sudo mysql
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'password';
+(3)utf8
+linux two config file set utf8
+linux mysql set global sql_mode remove two NO_ZERO_IN_DATE,NO_ZERO_DATE
