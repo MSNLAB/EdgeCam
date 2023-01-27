@@ -29,3 +29,7 @@ def frame_change_quality(frame, qp):
     cv2.imwrite(frame_path, frame, [cv2.IMWRITE_JPEG_QUALITY, qp])
     changed_image = cv2.imread(frame_path)
     return changed_image
+
+
+if __name__ == '__main__':
+    pass

@@ -16,11 +16,13 @@ class MessageTransmissionServicer(message_transmission_pb2_grpc.MessageTransmiss
         frame = base64_to_cv2(base64_frame).reshape(frame_shape)
         raw_shape = tuple(int(s) for s in request.raw_shape[1:-1].split(","))
 
-        task = Task(request.source_edge_id, request.frame_index, frame, request.start_time, raw_shape)
+        task = Task(request.source_edge_id, request.frame_index, frame, float(request.start_time), raw_shape)
         task.other = True
         if request.part_result != "":
             part_result = eval(request.part_result)
-            task.add_result(part_result['boxes'], part_result['class'], part_result['score'])
+            task.add_result(part_result['boxes'], part_result['labels'], part_result['scores'])
+        if request.note == "edge process":
+            task.edge_process = True
         self.local_queue.put(task, block=True)
 
         reply = message_transmission_pb2.MessageReply(

@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from loguru import logger
 from mapcalc import calculate_map
 from inferencer.model_info import classes
 
@@ -37,8 +38,8 @@ def cal_iou(a, b):
 
 def get_offloading_region(high_detections, low_regions, img_shape):
     """
-    去掉较大区域
-    去掉重合区域
+    Remove larger areas
+    Remove overlapping areas
     :param detection:
     :param inferencer:
     :return:
@@ -55,7 +56,7 @@ def get_offloading_region(high_detections, low_regions, img_shape):
         y2 = low_regions[i][3]
         if (x2 - x1) * (y2 - y1) > img_width * img_height * 0.1:
             continue
-        if len(high_detections) > 0:
+        if high_detections is not None:
             match = 0
             for j in range(len(high_detections)):
                 if cal_iou(low_regions[i], high_detections[j]) > 0.3:
@@ -68,17 +69,19 @@ def get_offloading_region(high_detections, low_regions, img_shape):
 
 def get_offloading_image(offloading_region, image):
     """
-    把这些区域放在同分辨率的黑色背景上，用高质量编码
+    Put these areas on a black background and encode them with high quality
     :param region_query:
     :return:
     """
     cropped_image = np.zeros_like(image)
+    width = image.shape[1]
+    hight = image.shape[0]
     cached_image = image
     for i in range(len(offloading_region)):
-        x1 = int(offloading_region[i][0])
-        y1 = int(offloading_region[i][1])
-        x2 = int(offloading_region[i][2])
-        y2 = int(offloading_region[i][3])
+        x1 = int(offloading_region[i][0])-1 if int(offloading_region[i][0])-1 >= 0 else 0
+        y1 = int(offloading_region[i][1])-1 if int(offloading_region[i][1])-1 >= 0 else 0
+        x2 = int(offloading_region[i][2])+1 if int(offloading_region[i][2])+1 <= width else width
+        y2 = int(offloading_region[i][3])+1 if int(offloading_region[i][3])+1 <= hight else hight
         cropped_image[y1:y2, x1:x2, :] = cached_image[y1:y2, x1:x2, :]
     return cropped_image
 
@@ -108,27 +111,4 @@ def cal_mAP(ground_truth, result_dict):
     return calculate_map(ground_truth, result_dict, 0.5)
 
 if __name__ == '__main__':
-    ground_truth = {
-        'boxes':
-            [[60., 80., 66., 92.],
-             [59., 94., 68., 97.],
-             [70., 87., 81., 94.],
-             [8., 34., 10., 36.]],
-
-        'labels':
-            ['2', '2', '3', '4']}
-
-    result_dict = {
-        'boxes':
-            [[57., 87., 66., 94.],
-             [58., 94., 68., 95.],
-             [70., 88., 81., 93.],
-             [10., 37., 17., 40.]],
-
-        'labels':
-            ['2', '2', '3', '4'],
-
-        'scores':
-            [0.99056727, 0.98965424, 0.93990153, 0.9157755]}
-    map = cal_mAP(ground_truth, result_dict)
-    print(map)
+    pass

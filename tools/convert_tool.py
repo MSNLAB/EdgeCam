@@ -31,10 +31,4 @@ def base64_to_cv2(string):
 
 
 if __name__ == '__main__':
-    img = cv2.imread('./inferencer/test_frame/1.jpg')
-    print(img.shape)
-    mem = os.path.getsize('../inferencer/test_frame/1.jpg')
-    base64str = cv2_to_base64(img, 100)
-    new_image = base64_to_cv2(base64str).reshape(img.shape)
-    print(new_image.shape)
-    cv2.imwrite('./inferencer/test_frame/1_ende.jpg', new_image)
+    pass

@@ -2,6 +2,8 @@ import cv2
 import torch
 import os
 import numpy as np
+from loguru import logger
+
 from inferencer.model_info import model_lib, COCO_INSTANCE_CATEGORY_NAMES, classes
 from PIL import Image
 from torchvision import transforms
@@ -9,15 +11,7 @@ from torchvision.models.detection import *
 
 from inferencer.utils import get_offloading_region, get_offloading_image
 
-"""
-1. 高置信度区域并且目标是vehicle认为是正确的。
-2. 低置信度区域中：去掉占据面积较大的（认为可以很好识别），
-去掉和高置信度区域重合超过30%的区域（认为是相同区域），
-得到需要高质量编码的区域。
-3. 对两部分进行分别编码，然后合并为一张图像
-4. 传输到大模型上，进行检测。
-5. 最后将大模型得到的结果与之前的结果进行合并
-"""
+
 
 class Object_Detection:
     def __init__(self, config, type):
@@ -27,7 +21,7 @@ class Object_Detection:
         else:
             self.model_name = config.large_model_name
         self.model = self.load_model()
-        self.threshold_low = 0.5
+        self.threshold_low = 0.2
         self.threshold_high = 0.8
 
     def load_model(self):
@@ -50,10 +44,16 @@ class Object_Detection:
         if pred_boxes == None:
             return 'object not detected'
         #filter high confidence region as the detection result
-        prediction_index = [pred_score.index(x) for x in pred_score if x > self.threshold_high][-1]
-        detection_boxes = pred_boxes[:prediction_index + 1]
-        detection_class = pred_class[:prediction_index + 1]
-        detection_score = pred_score[:prediction_index + 1]
+        try:
+            prediction_index = [pred_score.index(x) for x in pred_score if x > self.threshold_high][-1]
+        except IndexError:
+            detection_boxes = None
+            detection_class = None
+            detection_score = None
+        else:
+            detection_boxes = pred_boxes[:prediction_index + 1]
+            detection_class = pred_class[:prediction_index + 1]
+            detection_score = pred_score[:prediction_index + 1]
         #split into high and low confidence region
         high_detections = detection_boxes
         low_regions = pred_boxes

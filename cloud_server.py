@@ -36,16 +36,40 @@ class CloudServer:
         self.local_processor = threading.Thread(target=self.cloud_local, )
         self.local_processor.start()
 
+        #start the thread for uploading data
+        self.upload_data = Queue(config.data_queue_maxsize)
+        self.upload_processor = threading.Thread(target=self.uploading_worker,)
+        self.upload_processor.start()
+
     def cloud_local(self):
         while True:
             task = self.local_queue.get(block=True)
+            current_time = time.time()
+            while current_time - task.start_time > self.config.timeout_drop:
+                str_result = task.get_result()
+                task.time_out = True
+                in_data = (
+                    task.frame_index,
+                    datetime.fromtimestamp(task.start_time).strftime('%Y-%m-%d %H:%M:%S.%f'),
+                    datetime.fromtimestamp(current_time).strftime('%Y-%m-%d %H:%M:%S.%f'),
+                    str_result,
+                    "Timeout",
+                )
+                self.upload_data.put((task.edge_id, in_data), block=True)
+                task = self.local_queue.get(block=True)
+                current_time = time.time()
+
             task.set_frame_cloud(task.frame_edge)
             frame = task.frame_cloud
+            logger.debug(frame.shape)
+            logger.debug(task.raw_shape)
             high_boxes, high_class, high_score = self.large_object_detection.large_inference(frame)
+            logger.debug("high_boxes {}".format(high_boxes))
             # scale the small result
             scale = task.raw_shape[0] / frame.shape[0]
             if high_boxes:
                 high_boxes = (np.array(high_boxes) * scale).tolist()
+                logger.debug("high_boxes2 {}".format(high_boxes))
                 task.add_result(high_boxes, high_class, high_score)
 
             end_time = time.time()
@@ -56,10 +80,17 @@ class CloudServer:
                 task.frame_index,
                 datetime.fromtimestamp(float(task.start_time)).strftime('%Y-%m-%d %H:%M:%S.%f'),
                 datetime.fromtimestamp(task.end_time).strftime('%Y-%m-%d %H:%M:%S.%f'),
-                str_result,)
-            logger.debug(str(task.edge_id) + str(in_data))
-            self.database.insert_data(table_name='edge{}'.format(task.edge_id), data=in_data)
-            logger.debug('ok')
+                str_result,
+                "",
+            )
+
+            self.upload_data.put((task.edge_id, in_data), block=True)
+
+    def uploading_worker(self):
+        while True:
+            source_id, insert_data = self.upload_data.get(block=True)
+            self.database.insert_data(table_name='edge{}'.format(source_id), data=insert_data)
+            logger.debug("insert successfully " + str(source_id) + " " + str(insert_data))
 
 
     def start_server(self):

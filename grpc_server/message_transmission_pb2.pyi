@@ -31,10 +31,11 @@ class MessageReply(_message.Message):
     def __init__(self, destination_id: _Optional[int] = ..., local_length: _Optional[int] = ..., response: _Optional[str] = ...) -> None: ...
 
 class MessageRequest(_message.Message):
-    __slots__ = ["frame", "frame_index", "new_shape", "part_result", "raw_shape", "source_edge_id", "start_time"]
+    __slots__ = ["frame", "frame_index", "new_shape", "note", "part_result", "raw_shape", "source_edge_id", "start_time"]
     FRAME_FIELD_NUMBER: _ClassVar[int]
     FRAME_INDEX_FIELD_NUMBER: _ClassVar[int]
     NEW_SHAPE_FIELD_NUMBER: _ClassVar[int]
+    NOTE_FIELD_NUMBER: _ClassVar[int]
     PART_RESULT_FIELD_NUMBER: _ClassVar[int]
     RAW_SHAPE_FIELD_NUMBER: _ClassVar[int]
     SOURCE_EDGE_ID_FIELD_NUMBER: _ClassVar[int]
@@ -42,8 +43,9 @@ class MessageRequest(_message.Message):
     frame: str
     frame_index: int
     new_shape: str
+    note: str
     part_result: str
     raw_shape: str
     source_edge_id: int
     start_time: str
-    def __init__(self, source_edge_id: _Optional[int] = ..., frame_index: _Optional[int] = ..., start_time: _Optional[str] = ..., frame: _Optional[str] = ..., part_result: _Optional[str] = ..., raw_shape: _Optional[str] = ..., new_shape: _Optional[str] = ...) -> None: ...
+    def __init__(self, source_edge_id: _Optional[int] = ..., frame_index: _Optional[int] = ..., start_time: _Optional[str] = ..., frame: _Optional[str] = ..., part_result: _Optional[str] = ..., raw_shape: _Optional[str] = ..., new_shape: _Optional[str] = ..., note: _Optional[str] = ...) -> None: ...
