@@ -3,7 +3,7 @@
 **EdgeVision is an open source software framework for collaborative edge-cloud video analytics.**
 
 ## Install
-System Requirements
+-**System Requirements**
 * [ubuntu 18.04](http://releases.ubuntu.com/18.04/)
 * [Python 3.6.9](https://www.python.org/downloads/release/python-369/)
 * [Jetpack 4.5](https://developer.nvidia.com/jetpack-sdk-45-archive)
@@ -38,7 +38,23 @@ sudo apt install mysql-server
 ```
 ## Usage
 
+To be able to start the service for video analytics, please configure it step by step.
+-**Step 1:** Modify the configuration file (config/config.yaml) as needed.
+1. Video Source
+
+If the video source is a video file, please configure the path of the video file.
 ```
+ video_path: your video path
+```
+
+If the video source is a network camera, please configure the account, password, and IP address.
+```
+ rtsp:
+  label: True
+  account: your account
+  password: your password
+  ip_address: you camera ip
+  channel: 1
 ```
 
 ## Contributing
