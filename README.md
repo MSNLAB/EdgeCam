@@ -1,11 +1,13 @@
 # EdgeVision
 
-This repository contains the official implementation of an open-source software framework, EdgeVision, for collaborative video analytics. 
+**EdgeVision is an open source software framework for collaborative edge-cloud video analytics.**
 
 ## Install
-
+Edge
 ```
 ```
+Cloud
+Database
 
 ## Usage
 
