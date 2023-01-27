@@ -78,12 +78,29 @@ policy: Edge-Cloud-Assited
 ```
 
 For example:
--Edge-Cloud-Assisted: The inference for a video frame will be first conducted with the small DNN on the local edge, and the regions of the video frame that have low recognition confidence below a threshold will be offloaded to the cloud for inference with the large DNN model. The Edge node will not directly offload inference requests to the cloud. 
+
+-Edge-Cloud-Assisted: The inference for a video frame will be first conducted with the small DNN on the local edge, and the regions of the video frame that have low recognition confidence below a threshold will be offloaded to the cloud for inference with the large DNN model. The Edge node will not directly offload inference requests to the cloud.
+
 -Edge-Cloud-Threshold: When the length of the local inference queue on the edge node exceeds a specified threshold, the edge node will directly offload the video frame to the cloud.
+
+-**Step 2:** Start the cloud server.
+```bash
+cd ~/EdgeVision
+python3 cloud_server.py
+```
+
+-**Step 3:** Start the edge node.
+
+Please use the following command for each edge node.
+```bash
+cd ~/EdgeVision
+python3 edge_client.py
+```
 
 ## Contributing
 
-PRs accepted.
+If you have any questions, please feel free to contact us.
+Email: guanyugao@gmail.com; gygao@njust.edu.cn; dongyuqi@njust.edu.cn
 
 ## License
 
