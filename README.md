@@ -5,10 +5,10 @@
 ## Overview
 EdgeVision consists of multiple edge nodes and a cloud server that work collaboratively to handle inference requests.
 
-- **Edge node: ** 
+- **Edge node:** 
 Edge nodes in different geographical locations read video frames through network cameras and perform inference through the small DNN model. 
 The functions of the edge node include reading the video frame, calculating difference, local inference, offloading, video frame pre-processing, and information updater.
-- **Cloud: **
+- **Cloud:**
 The cloud server is deployed with large DNN models with more significant computational complexity and higher recognition accuracy. 
 The cloud server listens to the inference requests from the edge nodes. 
 After receiving an inference request, the cloud server puts the task into the inference queue. 
