@@ -14,7 +14,7 @@ The cloud server listens to the inference requests from the edge nodes.
 After receiving an inference request, the cloud server puts the task into the inference queue. 
 The cloud can either perform inference for the whole video frame or the regions that need further analytics with more precise models.
 
-![structure](./docs/structure.png)
+<img src="./docs/structure.png" width="50%" height="50%">
 
 ## Install
 - **System Requirements**
