@@ -44,19 +44,31 @@ To be able to start the service for video analytics, please configure it step by
 
 If the video source is a video file, please configure the path of the video file.
 ```
- video_path: your video path
+video_path: your video path
 ```
 
 If the video source is a network camera, please configure the account, password, and IP address.
 ```
- rtsp:
-  label: True
-  account: your account
-  password: your password
-  ip_address: you camera ip
-  channel: 1
+rtsp:
+ label: True
+ account: your account
+ password: your password
+ ip_address: your camera ip
+ channel: 1
+```
+2. IP configuration
+
+Please configure the IP address of the cloud server.
+```
+server_ip: 'server ip:50051'
 ```
 
+Please configure the number and IP addresses of edge nodes.
+```
+edge_id: the edge node ID
+edge_num: the number of edge nodes
+edges: ['edge ip 1:50051', 'edge ip 2:50051', ...]
+```
 ## Contributing
 
 PRs accepted.
