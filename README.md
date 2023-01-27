@@ -10,10 +10,12 @@ System Requirements
 * [cuda 10.2](https://developer.nvidia.com/cuda-toolkit)
 * [pytorch 1.9.0](https://pytorch.org/)
 
--**Edge Node** Please install the following libraries on each edge node.
+-**Edge Node** 
+
+Please install the following libraries on each edge node.
 1. Install the corresponding version of [torch, torchvision](https://forums.developer.nvidia.com/t/pytorch-for-jetson/72048), opencv-python.
 2. Install the following libraries.
-```
+```bash
 pip3 install munch
 pip3 install grpcio
 pip3 install grpcio-tools
@@ -28,8 +30,12 @@ pip3 install imutils
 
 Similar to the installation on the edge node, install the corresponding version of [torch, torchvision](https://pytorch.org/get-started/previous-versions/) and required libraries.
 
-Database
+-**Database**
 
+Please install and configure the MySQL database.
+```bash
+sudo apt install mysql-server
+```
 ## Usage
 
 ```
