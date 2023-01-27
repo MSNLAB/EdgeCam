@@ -26,7 +26,7 @@ The cloud can either perform inference for the whole video frame or the regions 
 - **Edge Node** 
 
 Please install the following libraries on each edge node.
-1. Install the corresponding version of [torch, torchvision](https://forums.developer.nvidia.com/t/pytorch-for-jetson/72048), opencv-python.
+1. Install the corresponding version of [torch](https://forums.developer.nvidia.com/t/pytorch-for-jetson/72048), [torchvision](https://forums.developer.nvidia.com/t/pytorch-for-jetson/72048), and opencv-python.
 2. Install the following libraries.
 ```bash
 pip3 install munch
@@ -41,7 +41,7 @@ pip3 install imutils
 
 - **Cloud**
 
-Similar to the installation on the edge node, install the corresponding version of [torch, torchvision](https://pytorch.org/get-started/previous-versions/) and required libraries.
+Similar to the installation on the edge node, install the corresponding version of [torch](https://pytorch.org/get-started/previous-versions/), [torchvision](https://pytorch.org/get-started/previous-versions/) and required libraries.
 
 - **Database**
 
