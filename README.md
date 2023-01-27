@@ -2,15 +2,23 @@
 
 **EdgeVision is an open source software framework for collaborative edge-cloud video analytics.**
 
-## Install
--**System Requirements**
-* [ubuntu 18.04](http://releases.ubuntu.com/18.04/)
-* [Python 3.6.9](https://www.python.org/downloads/release/python-369/)
-* [Jetpack 4.5](https://developer.nvidia.com/jetpack-sdk-45-archive)
-* [cuda 10.2](https://developer.nvidia.com/cuda-toolkit)
-* [pytorch 1.9.0](https://pytorch.org/)
+## Overview
+EdgeVision consists of multiple edge nodes and a cloud server that work collaboratively to handle inference requests.
 
--**Edge Node** 
+- **Edge node:** 
+Edge nodes in different geographical locations read video frames through network cameras and perform inference through the small DNN model. 
+The functions of the edge node include reading the video frame, calculating difference, local inference, offloading, video frame pre-processing, and information updater.
+- **Cloud:**
+The cloud server is deployed with large DNN models with more significant computational complexity and higher recognition accuracy. 
+The cloud server listens to the inference requests from the edge nodes. 
+After receiving an inference request, the cloud server puts the task into the inference queue. 
+The cloud can either perform inference for the whole video frame or the regions that need further analytics with more precise models.
+
+## Install
+- **System Requirements**
+[ubuntu 18.04](http://releases.ubuntu.com/18.04/), [Python 3.6.9](https://www.python.org/downloads/release/python-369/), [Jetpack 4.5](https://developer.nvidia.com/jetpack-sdk-45-archive), [cuda 10.2](https://developer.nvidia.com/cuda-toolkit), [pytorch 1.9.0](https://pytorch.org/)
+
+- **Edge Node** 
 
 Please install the following libraries on each edge node.
 1. Install the corresponding version of [torch, torchvision](https://forums.developer.nvidia.com/t/pytorch-for-jetson/72048), opencv-python.
@@ -26,11 +34,11 @@ pip3 install APScheduler
 pip3 install imutils
 ```
 
--**Cloud**
+- **Cloud**
 
 Similar to the installation on the edge node, install the corresponding version of [torch, torchvision](https://pytorch.org/get-started/previous-versions/) and required libraries.
 
--**Database**
+- **Database**
 
 Please install and configure the MySQL database.
 ```bash
@@ -40,7 +48,7 @@ sudo apt install mysql-server
 
 To be able to start the service for video analytics, please configure it step by step.
 
--**Step 1:** Modify the configuration file (config/config.yaml) as needed.
+**Step 1:** Modify the configuration file (config/config.yaml) as needed.
 1. Video Source
 
 If the video source is a video file, please configure the path of the video file.
@@ -70,7 +78,15 @@ edge_id: the edge node ID
 edge_num: the number of edge nodes
 edges: ['edge ip 1:50051', 'edge ip 2:50051', ...]
 ```
-3. Offloading policy
+
+3. Database
+
+To be able to connect to the database, please configure user name, password, and ip address of the database.
+```
+connection: {'user': 'user name', 'password': 'root', 'host': 'database ip', 'raise_on_warnings': True}
+```
+
+4. Offloading policy
 
 Please configure offloading policy. 
 ```
@@ -79,17 +95,17 @@ policy: Edge-Cloud-Assited
 
 For example:
 
--Edge-Cloud-Assisted: The inference for a video frame will be first conducted with the small DNN on the local edge, and the regions of the video frame that have low recognition confidence below a threshold will be offloaded to the cloud for inference with the large DNN model. The Edge node will not directly offload inference requests to the cloud.
+- Edge-Cloud-Assisted: The inference for a video frame will be first conducted with the small DNN on the local edge, and the regions of the video frame that have low recognition confidence below a threshold will be offloaded to the cloud for inference with the large DNN model. The Edge node will not directly offload inference requests to the cloud.
 
--Edge-Cloud-Threshold: When the length of the local inference queue on the edge node exceeds a specified threshold, the edge node will directly offload the video frame to the cloud.
+- Edge-Cloud-Threshold: When the length of the local inference queue on the edge node exceeds a specified threshold, the edge node will directly offload the video frame to the cloud.
 
--**Step 2:** Start the cloud server.
+**Step 2:** Start the cloud server.
 ```bash
 cd ~/EdgeVision
 python3 cloud_server.py
 ```
 
--**Step 3:** Start the edge node.
+**Step 3:** Start the edge node.
 
 Please use the following command for each edge node.
 ```bash
