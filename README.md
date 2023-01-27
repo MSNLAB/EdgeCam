@@ -4,17 +4,21 @@
 
 ## Overview
 EdgeVision consists of multiple edge nodes and a cloud server that work collaboratively to handle inference requests.
-- Edge nodes: 
+
+- **Edge node**: 
+
 Edge nodes in different geographical locations read video frames through network cameras and perform inference through the small DNN model. 
 The functions of the edge node include reading the video frame, calculating difference, local inference, offloading, video frame pre-processing, and information updater.
+- **Cloud**
+
+The cloud server is deployed with large DNN models with more significant computational complexity and higher recognition accuracy. 
+The cloud server listens to the inference requests from the edge nodes. 
+After receiving an inference request, the cloud server puts the task into the inference queue. 
+The cloud can either perform inference for the whole video frame or the regions that need further analytics with more precise models.
 
 ## Install
 - **System Requirements**
-[ubuntu 18.04](http://releases.ubuntu.com/18.04/)
-[Python 3.6.9](https://www.python.org/downloads/release/python-369/)
-[Jetpack 4.5](https://developer.nvidia.com/jetpack-sdk-45-archive)
-[cuda 10.2](https://developer.nvidia.com/cuda-toolkit)
-[pytorch 1.9.0](https://pytorch.org/)
+[ubuntu 18.04](http://releases.ubuntu.com/18.04/), [Python 3.6.9](https://www.python.org/downloads/release/python-369/), [Jetpack 4.5](https://developer.nvidia.com/jetpack-sdk-45-archive), [cuda 10.2](https://developer.nvidia.com/cuda-toolkit), [pytorch 1.9.0](https://pytorch.org/)
 
 - **Edge Node** 
 
