@@ -10,6 +10,7 @@ System Requirements
 * [cuda 10.2](https://developer.nvidia.com/cuda-toolkit)
 * [pytorch 1.9.0](https://pytorch.org/)
 Edge
+
 Please install the corresponding version of [torch, torchvision](https://forums.developer.nvidia.com/t/pytorch-for-jetson/72048), opencv-python.
 
 ```
