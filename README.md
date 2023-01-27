@@ -39,6 +39,7 @@ sudo apt install mysql-server
 ## Usage
 
 To be able to start the service for video analytics, please configure it step by step.
+
 -**Step 1:** Modify the configuration file (config/config.yaml) as needed.
 1. Video Source
 
@@ -69,6 +70,17 @@ edge_id: the edge node ID
 edge_num: the number of edge nodes
 edges: ['edge ip 1:50051', 'edge ip 2:50051', ...]
 ```
+3. Offloading policy
+
+Please configure offloading policy. 
+```
+policy: Edge-Cloud-Assited
+```
+
+For example:
+-Edge-Cloud-Assisted: The inference for a video frame will be first conducted with the small DNN on the local edge, and the regions of the video frame that have low recognition confidence below a threshold will be offloaded to the cloud for inference with the large DNN model. The Edge node will not directly offload inference requests to the cloud. 
+-Edge-Cloud-Threshold: When the length of the local inference queue on the edge node exceeds a specified threshold, the edge node will directly offload the video frame to the cloud.
+
 ## Contributing
 
 PRs accepted.
