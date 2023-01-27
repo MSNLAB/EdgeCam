@@ -70,7 +70,15 @@ edge_id: the edge node ID
 edge_num: the number of edge nodes
 edges: ['edge ip 1:50051', 'edge ip 2:50051', ...]
 ```
-3. Offloading policy
+
+3. Database
+
+To be able to connect to the database, please configure user name, password, and ip address of the database.
+```
+connection: {'user': 'user name', 'password': 'root', 'host': 'database ip', 'raise_on_warnings': True}
+```
+
+4. Offloading policy
 
 Please configure offloading policy. 
 ```
