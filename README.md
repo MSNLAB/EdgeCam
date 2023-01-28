@@ -1,6 +1,6 @@
 # EdgeVision
 
-**EdgeVision is an open source software framework for collaborative edge-cloud video analytics.**
+**EdgeVision is an edge-edge and edge-cloud collaborative framework for content-aware video analytics.**
 
 ## Overview
 EdgeVision consists of multiple edge nodes and a cloud server that work collaboratively to handle inference requests.
