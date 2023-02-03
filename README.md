@@ -19,14 +19,14 @@ The cloud can either perform inference for the whole video frame or the regions 
 </div>
 
 ## Install
-1. **System Requirements**
+**1. System Requirements**
 
 * [ubuntu 18.04](http://releases.ubuntu.com/18.04/)
 * [Python 3.6.9](https://www.python.org/downloads/release/python-369/)
 * [Jetpack 4.5](https://developer.nvidia.com/jetpack-sdk-45-archive)
 * [cuda 10.2](https://developer.nvidia.com/cuda-toolkit), [pytorch 1.9.0](https://pytorch.org/)
 
-2. **Edge Node** 
+**2. Edge Node** 
 
 Please install the following libraries on each edge node.
 * Install the corresponding version of [torch](https://forums.developer.nvidia.com/t/pytorch-for-jetson/72048), [torchvision](https://forums.developer.nvidia.com/t/pytorch-for-jetson/72048), and opencv-python.
@@ -42,11 +42,11 @@ pip3 install APScheduler
 pip3 install imutils
 ```
 
-3. **Cloud**
+**3. Cloud**
 
 Similar to the installation on the edge node, install the corresponding version of [torch](https://pytorch.org/get-started/previous-versions/), [torchvision](https://pytorch.org/get-started/previous-versions/) and required libraries.
 
-4. **Database**
+**4. Database**
 
 Please install and configure the MySQL database.
 ```bash
