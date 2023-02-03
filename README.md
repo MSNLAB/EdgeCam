@@ -18,6 +18,14 @@ The cloud can either perform inference for the whole video frame or the regions 
 <img src="./docs/structure.png" width="50%" height="50%">
 </div>
 
+## Workflow
+EdgeVision supports three video analytics pipelines to process a video frame.
+1. The video frame is first put into the local queue of the edge node and inferred with the local small DNN model. 
+The edge node selects the regions of the video frame that have low recognition confidence from the recognition results, and encodes these parts of the image in specified quality and offloads them to the cloud for inference with the large DNN models.
+2. The video frame can be directly dispatched to another edge node with a lighter workload for inference.
+When another edge node receives the video frame, it can be processed through Case 1 of the video analytics pipelines.
+3. The video frame can also be directly offloaded to the cloud for inference.
+
 ## Install
 **1. System Requirements**
 
