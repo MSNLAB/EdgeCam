@@ -91,7 +91,7 @@ edges: ['edge ip 1:50051', 'edge ip 2:50051', ...]
 
 To be able to connect to the database, please configure user name, password, and ip address of the database.
 ```
-connection: {'user': 'user name', 'password': 'root', 'host': 'database ip', 'raise_on_warnings': True}
+connection: {'user': 'your name', 'password': 'your password', 'host': 'database ip', 'raise_on_warnings': True}
 ```
 
 4. Offloading policy
