@@ -22,7 +22,6 @@ The cloud can either perform inference for the whole video frame or the regions 
 - **System Requirements**
 
 [ubuntu 18.04](http://releases.ubuntu.com/18.04/)
-
 [Python 3.6.9](https://www.python.org/downloads/release/python-369/)
 
 [Jetpack 4.5](https://developer.nvidia.com/jetpack-sdk-45-archive)
