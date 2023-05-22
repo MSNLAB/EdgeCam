@@ -1,4 +1,5 @@
 import time
+import munch
 import mysql.connector
 from datetime import datetime
 from mysql.connector import errorcode
@@ -10,11 +11,27 @@ class DataBase:
     def __init__(self, config):
         self.cnx = mysql.connector.connect(**config.connection)
         self.database_name = config.database_name
-        self.tables = config.tables
-        self.table_description = config.table_description
-        self.insert_description = config.insert_description
-        self.select_description = config.select_description
+        self.table_desc = "CREATE TABLE `{}` " \
+                                 "(`index` int NOT NULL, " \
+                                 "`start_time` timestamp(6) NOT NULL," \
+                                 "`end_time` timestamp(6) NOT NULL, " \
+                                 "`result` TEXT, " \
+                                 "`log` VARCHAR(255)," \
+                                 "PRIMARY KEY(`index`)) ENGINE=InnoDB"
 
+        self.insert_desc = "INSERT INTO `{}` " \
+                                  "(`index`, `start_time`, `end_time`, `result`, `log`) " \
+                                  "VALUES (%s ,%s, %s, %s, %s);"
+
+        self.select_desc= "SELECT `index`, `start_time`, `end_time`, `result`, `log` FROM `{}`;"
+
+        self.select_one_desc = "SELECT `index`, `start_time`, `end_time`, `result`, `log` FROM `{}`" \
+                               "where `index` = %s"
+
+        self.update_desc = "UPDATE {} SET `end_time` = %s, " \
+                                    "`result` = %s, " \
+                                    "`log` = %s " \
+                                    "WHERE `index` = %s"
 
     def _create_database(self, cursor):
         try:
@@ -38,29 +55,27 @@ class DataBase:
                 exit(1)
         cursor.close()
 
-    def create_tables(self):
+    def create_table(self, edge_id):
         cursor = self.cnx.cursor()
-        table_description = self.table_description
-        for table_name in self.tables:
-            try:
-                logger.info("Creating table {}: ".format(table_name))
-                cursor.execute(table_description.format(table_name))
-            except mysql.connector.Error as err:
-                if err.errno == errorcode.ER_TABLE_EXISTS_ERROR:
-                    cursor.execute("drop table {}".format(table_name))
-                    logger.info("already exists, drop it.")
-                    cursor.execute(table_description.format(table_name))
-                else:
-                    logger.error(err.msg)
+        table_sql = self.table_desc
+        try:
+            logger.info("Creating table {}: ".format(edge_id))
+            cursor.execute(table_sql.format(edge_id))
+        except mysql.connector.Error as err:
+            if err.errno == errorcode.ER_TABLE_EXISTS_ERROR:
+                cursor.execute("drop table {}".format(edge_id))
+                logger.info("already exists, drop it.")
+                cursor.execute(table_sql.format(edge_id))
             else:
-                logger.success("create successfully")
+                logger.error(err.msg)
+        else:
+            logger.success("create successfully")
         cursor.close()
 
     def clear_table(self, edge_id):
         cursor = self.cnx.cursor()
-        table_name = self.tables[edge_id - 1]
         try:
-            cursor.execute("truncate table {}".format(table_name))
+            cursor.execute("truncate table {}".format(edge_id))
         except mysql.connector.Error as err:
             cursor.close()
             logger.error(err.msg)
@@ -71,10 +86,9 @@ class DataBase:
 
     def select_result(self, edge_id):
         cursor = self.cnx.cursor()
-        select_description = self.select_description
-        table_name = self.tables[edge_id-1]
+        select_sql = self.select_desc
         try:
-            cursor.execute(select_description.format(table_name))
+            cursor.execute(select_sql.format(edge_id))
             results = cursor.fetchall()
         except Exception as e:
             logger.error('Query failed {}'.format(e))
@@ -85,9 +99,24 @@ class DataBase:
             logger.success('query successfully')
             return results
 
+    def select_one_result(self, edge_id, index):
+        cursor = self.cnx.cursor()
+        select_sql = self.select_one_desc
+        try:
+            cursor.execute(select_sql.format(edge_id), index)
+            result = cursor.fetchone()
+        except Exception as e:
+            logger.error('Query failed {}'.format(e))
+            cursor.close()
+            return None
+        else:
+            cursor.close()
+            logger.success('query successfully')
+            return result
+
     def insert_data(self, table_name, data):
         cursor = self.cnx.cursor()
-        insert_sql = self.insert_description.format(table_name)
+        insert_sql = self.insert_desc.format(table_name)
         try:
             cursor.execute(insert_sql, data)
             # Make sure data is committed to the database
@@ -101,6 +130,27 @@ class DataBase:
             logger.success('insert successfully')
 
 
+    def update_data(self, table_name, data):
+        cursor = self.cnx.cursor()
+        update_sql = self.update_desc.format(table_name)
+        try:
+            cursor.execute(update_sql, data)
+            # Make sure data is committed to the database
+            self.cnx.commit()
+
+        except Exception as e:
+            cursor.close()
+            logger.error("update error {}".format(e))
+        else:
+            cursor.close()
+            logger.success('update successfully')
+
+
 
 if __name__ == '__main__':
-    pass
+    config = {
+        "connection": {'user': 'root', 'password': 'root', 'host': '127.0.0.1', 'raise_on_warnings': True},
+        "database_name": 'mydatabase',
+    }
+    config = munch.munchify(config)
+    mydb = DataBase(config)

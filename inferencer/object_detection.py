@@ -42,7 +42,7 @@ class Object_Detection:
     def small_inference(self, img):
         pred_boxes, pred_class, pred_score = self.get_model_prediction(img, self.threshold_low)
         if pred_boxes == None:
-            return 'object not detected'
+            return 'target not detected'
         #filter high confidence region as the detection result
         try:
             prediction_index = [pred_score.index(x) for x in pred_score if x > self.threshold_high][-1]
@@ -63,7 +63,6 @@ class Object_Detection:
             offloading_image = None
         else:
             offloading_image = get_offloading_image(offloading_region, img)
-
         return offloading_image, detection_boxes, detection_class, detection_score
 
 
@@ -82,12 +81,12 @@ class Object_Detection:
         res = self.model([img])
 
         if torch.cuda.is_available():
-            prediction_class = [COCO_INSTANCE_CATEGORY_NAMES[i] for i in list(res[0]['labels'].cuda().data.cpu().numpy())]
+            prediction_class = list(res[0]['labels'].cuda().data.cpu().numpy())
             prediction_boxes = [[i[0], i[1], i[2], i[3]] for i in list(res[0]['boxes'].detach().cpu().numpy())]
             prediction_score = list(res[0]['scores'].detach().cpu().numpy())
 
         else:
-            prediction_class = [COCO_INSTANCE_CATEGORY_NAMES[i] for i in list(res[0]['labels'].numpy())]
+            prediction_class = list(res[0]['labels'].numpy())
             prediction_boxes = [[i[0], i[1], i[2], i[3]] for i in list(res[0]['boxes'].detach().numpy())]
             prediction_score = list(res[0]['scores'].detach().numpy())
 
@@ -99,19 +98,7 @@ class Object_Detection:
             pred_boxes = prediction_boxes[:prediction_t+1]
             pred_class = prediction_class[:prediction_t+1]
             pred_score = prediction_score[:prediction_t+1]
-
-            detections_vehicle_boxes = []
-            detections_vehicle_class = []
-            detections_vehicle_score = []
-            vehicle_classes = classes['vehicle']
-            for i in range(len(pred_boxes)):
-                if pred_class[i] in vehicle_classes:
-                    detections_vehicle_boxes.append(pred_boxes[i])
-                    detections_vehicle_class.append(pred_class[i])
-                    detections_vehicle_score.append(pred_score[i])
-            if len(detections_vehicle_boxes) == 0:
-                return None, None, None
-            return detections_vehicle_boxes, detections_vehicle_class, detections_vehicle_score
+            return pred_boxes, pred_class, pred_score
 
 
 

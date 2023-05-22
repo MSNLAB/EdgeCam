@@ -2,16 +2,16 @@ import cv2
 from loguru import logger
 
 class VideoProcessor:
-    def __init__(self, source, max_count=180):
+    def __init__(self, source):
         self.video_path = source.video_path
         self.rtsp = source.rtsp
         self.frame_count = 0
-        self.max_count = max_count
+        self.max_count = source.max_count
         self.index = 0
         self.fps = None
 
     def __enter__(self):
-        if self.video_path and self.rtsp.label is False:
+        if self.video_path and self.rtsp.flag is False:
             self.cap = cv2.VideoCapture(self.video_path)
             if not self.cap:
                 logger.error("can not open the video")
@@ -19,7 +19,7 @@ class VideoProcessor:
             if self.max_count and self.max_count > 0:
                 self.frame_count = min(self.frame_count, self.max_count)
             self.fps = self.cap.get(cv2.CAP_PROP_FPS)
-        elif self.rtsp.label:
+        elif self.rtsp.flag:
             account = self.rtsp.account
             password = self.rtsp.password
             ip_address = self.rtsp.ip_address

@@ -8,21 +8,17 @@ class Task:
         self.frame_edge = frame
         self.start_time = start_time
         self.raw_shape = raw_shape
+        self.state = None
         self.end_time = None
         self.frame_cloud = None
         self.other = False
         self.directly_cloud = False
         self.edge_process = False
-        self.time_out = False
+
         self.detection_boxes = []
         self.detection_class = []
         self.detection_score = []
-
-    def set_frame_cloud(self, offloading_frame):
-        self.frame_cloud = offloading_frame
-
-    def set_end_time(self, end_time):
-        self.end_time = end_time
+        self.ref_list = []
 
     def add_result(self, detection_boxes, detection_class, detection_score):
         if detection_boxes is not None:
@@ -33,9 +29,4 @@ class Task:
                 self.detection_score.append(detection_score[i])
 
     def get_result(self):
-        result_dict = {
-            'boxes': self.detection_boxes,
-            'labels': self.detection_class,
-            'scores': self.detection_score
-        }
-        return str(result_dict)
+        return self.detection_boxes, self.detection_class, self.detection_score
