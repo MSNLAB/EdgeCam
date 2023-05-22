@@ -30,7 +30,6 @@ from tools.video_processor import VideoProcessor
 
 
 
-
 class EdgeWorker:
     def __init__(self, config):
 
@@ -48,8 +47,10 @@ class EdgeWorker:
         self.frame_cache = Queue(config.frame_cache_maxsize)
         self.local_queue = Queue(config.local_queue_maxsize)
 
+        self.pred_res = []
+        self.avg_scores = []
+        self.select_index = []
         self.annotations = []
-
         # read video
         self.video_reader = threading.Thread(target=self.video_read,)
         self.video_reader.start()
@@ -64,6 +65,8 @@ class EdgeWorker:
 
         # start the thread for retrain process
         self.retrain_flag = False
+        self.collect_flag = True
+        self.cache_count = 0
         self.retrain_processor = threading.Thread(target=self.retrain_worker,)
         self.retrain_processor.start()
 
@@ -173,27 +176,13 @@ class EdgeWorker:
             current_task = self.local_queue.get(block=True)
             current_frame = current_task.frame_edge
             # get the query image and the small inference result
-            small_result = self.small_object_detection.small_inference(current_frame)
-            # 1. write to cache, [frame, annotation]
-            cv2.imwrite(os.path.join(self.config.cache_path, str(current_task.index) + '.jpg'), current_frame)
-            # 2. enough, start retrain step
-            # 3. select frame according average score
-            # 4. send to cloud, get ground truth
-            # 5. retrain
+            offloading_image, detection_boxes, detection_class, detection_score \
+                = self.small_object_detection.small_inference(current_frame)
+            # write to cache, [frame, annotation]
+            if self.collect_flag:
+                self.collect_data(current_task, current_frame ,detection_boxes, detection_class, detection_score)
 
-            if small_result != 'target not detected':
-                offloading_image, detection_boxes, detection_class, detection_score = small_result
-                for score, label, box in zip(detection_score, detection_class, detection_boxes):
-                    score = score.cpu().detach().item()
-                    label = label.cpu().detach().item()
-                    box = box.cpu().detach().tolist()
-                    self.annotations.append((current_task.index, label, box[0], box[1], box[2], box[3], score))
-                if len(self.annotations) >= 20:
-                    np.savetxt(self.config.annotation_path, self.annotations, fmt=['%d', '%d', '%f', '%f', '%f', '%f', '%f'], delimiter=',')
-                    self.annotations = []
-                    self.retrain_flag = True
-
-
+            if offloading_image != None and detection_boxes != None:
                 current_task.add_result(detection_boxes, detection_class, detection_score)
                 # whether to further inference
                 if offloading_image is not None and current_task.edge_process is False:
@@ -301,17 +290,64 @@ class EdgeWorker:
                 stub = message_transmission_pb2_grpc.MessageTransmissionStub(channel)
                 res = stub.task_processor(msg_request)
             except Exception as e:
-                logger.exception("the edge ip {} can not reply".format(destination_edge_ip))
+                logger.exception("the edge id{}, ip {} can not reply, {}".format(destination_edge_id,destination_edge_ip,e))
                 self.local_queue.put(current_task, block=True)
             else:
                 logger.info(str(res))
-    
-    
-    
+
+    #
+    def collect_data(self, current_task, current_frame ,detection_boxes, detection_class, detection_score):
+        self.select_index = []
+        cv2.imwrite(os.path.join(self.config.cache_path, str(current_task.index) + '.jpg'), current_frame)
+        self.avg_scores.append({current_task.index:np.mean(detection_score)})
+        for score, label, box in zip(detection_score, detection_class, detection_boxes):
+            self.cache_count += 1
+            score = score.cpu().detach().item()
+            label = label.cpu().detach().item()
+            box = box.cpu().detach().tolist()
+            self.pred_res.append((current_task.index, label, box[0], box[1], box[2], box[3], score))
+            if self.cache_count >= 100:
+                smallest_elements = sorted(self.avg_scores, key=lambda d: list(d.values())[0])[:10]
+                self.select_index = [list(d.keys())[0] for d in smallest_elements]
+                print(self.select_index)
+
+                np.savetxt(self.config.pred_res_path, self.pred_res,
+                           fmt=['%d', '%d', '%f', '%f', '%f', '%f', '%f'], delimiter=',')
+
+                self.pred_res = []
+                self.retrain_flag = True
+                self.collect_flag = False
+                self.cache_count = 0
+
+    # 4. send to cloud, get ground truth
+    # 5. retrain
     def retrain_worker(self):
         while self.retrain_flag:
+            self.annotations = []
+            for index in self.select_index:
+                path = os.path.join(self.config.cache_path, index, '.jpg')
+                frame = cv2.imread(path)
+                target_res = get_cloud_target(frame)
+                for score, label, box in zip(target_res['scores'], target_res['labels'], target_res['boxes']):
+                    score = score.cpu().detach().item()
+                    label = label.cpu().detach().item()
+                    box = box.cpu().detach().tolist()
+                    if score >= 0.20:
+                        self.annotations.append(
+                            (index, label, box[0], box[1],
+                             box[2], box[3], score)
+                        )
+            if len(self.annotations):
+                np.savetxt(self.config.annotation_path, self.annotations,
+                           fmt=['%d', '%d', '%f', '%f', '%f', '%f', '%f'], delimiter=',')
 
+            self.small_object_detection.retrain()
+            self.collect_flag = True
             pass
+
+
+
+
 
     def decision_worker(self, task):
         policy = self.config.policy
