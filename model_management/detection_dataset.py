@@ -3,7 +3,7 @@ import pandas as pd
 import torch
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
-from inferencer.detection_transforms import Compose, ToTensor, Resize
+from model_management.detection_transforms import Compose, ToTensor, Resize
 
 
 class DetectionDataset(Dataset):

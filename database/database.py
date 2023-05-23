@@ -13,8 +13,8 @@ class DataBase:
         self.database_name = config.database_name
         self.table_desc = "CREATE TABLE `{}` " \
                                  "(`index` int NOT NULL, " \
-                                 "`start_time` timestamp(6) NOT NULL," \
-                                 "`end_time` timestamp(6) NOT NULL, " \
+                                 "`start_time` timestamp(6)," \
+                                 "`end_time` timestamp(6), " \
                                  "`result` TEXT, " \
                                  "`log` VARCHAR(255)," \
                                  "PRIMARY KEY(`index`)) ENGINE=InnoDB"
@@ -28,7 +28,7 @@ class DataBase:
         self.select_one_desc = "SELECT `index`, `start_time`, `end_time`, `result`, `log` FROM `{}`" \
                                "where `index` = %s"
 
-        self.update_desc = "UPDATE {} SET `end_time` = %s, " \
+        self.update_desc = "UPDATE `{}` SET `end_time` = %s, " \
                                     "`result` = %s, " \
                                     "`log` = %s " \
                                     "WHERE `index` = %s"
@@ -55,27 +55,28 @@ class DataBase:
                 exit(1)
         cursor.close()
 
-    def create_table(self, edge_id):
+    def create_table(self, edge_ids):
         cursor = self.cnx.cursor()
         table_sql = self.table_desc
-        try:
-            logger.info("Creating table {}: ".format(edge_id))
-            cursor.execute(table_sql.format(edge_id))
-        except mysql.connector.Error as err:
-            if err.errno == errorcode.ER_TABLE_EXISTS_ERROR:
-                cursor.execute("drop table {}".format(edge_id))
-                logger.info("already exists, drop it.")
-                cursor.execute(table_sql.format(edge_id))
+        for id in edge_ids:
+            try:
+                logger.info("Creating table `{}` ".format(id))
+                cursor.execute(table_sql.format(id))
+            except mysql.connector.Error as err:
+                if err.errno == errorcode.ER_TABLE_EXISTS_ERROR:
+                    cursor.execute("drop table `{}`".format(id))
+                    logger.info("already exists, drop it.")
+                    cursor.execute(table_sql.format(id))
+                else:
+                    logger.error(err.msg)
             else:
-                logger.error(err.msg)
-        else:
-            logger.success("create successfully")
+                logger.success("create successfully")
         cursor.close()
 
     def clear_table(self, edge_id):
         cursor = self.cnx.cursor()
         try:
-            cursor.execute("truncate table {}".format(edge_id))
+            cursor.execute("truncate table `{}`".format(edge_id))
         except mysql.connector.Error as err:
             cursor.close()
             logger.error(err.msg)
@@ -103,8 +104,9 @@ class DataBase:
         cursor = self.cnx.cursor()
         select_sql = self.select_one_desc
         try:
-            cursor.execute(select_sql.format(edge_id), index)
+            cursor.execute(select_sql.format(edge_id), (index,))
             result = cursor.fetchone()
+            logger.debug(result)
         except Exception as e:
             logger.error('Query failed {}'.format(e))
             cursor.close()

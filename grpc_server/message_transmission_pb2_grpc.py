@@ -2,7 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-import grpc_server.message_transmission_pb2 as message__transmission__pb2
+from grpc_server import message_transmission_pb2 as message__transmission__pb2
 
 
 class MessageTransmissionStub(object):
@@ -24,6 +24,11 @@ class MessageTransmissionStub(object):
                 request_serializer=message__transmission__pb2.InfoRequest.SerializeToString,
                 response_deserializer=message__transmission__pb2.InfoReply.FromString,
                 )
+        self.frame_processor = channel.unary_unary(
+                '/MessageTransmission/frame_processor',
+                request_serializer=message__transmission__pb2.FrameRequest.SerializeToString,
+                response_deserializer=message__transmission__pb2.FrameReply.FromString,
+                )
 
 
 class MessageTransmissionServicer(object):
@@ -41,6 +46,12 @@ class MessageTransmissionServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def frame_processor(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_MessageTransmissionServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -53,6 +64,11 @@ def add_MessageTransmissionServicer_to_server(servicer, server):
                     servicer.get_queue_info,
                     request_deserializer=message__transmission__pb2.InfoRequest.FromString,
                     response_serializer=message__transmission__pb2.InfoReply.SerializeToString,
+            ),
+            'frame_processor': grpc.unary_unary_rpc_method_handler(
+                    servicer.frame_processor,
+                    request_deserializer=message__transmission__pb2.FrameRequest.FromString,
+                    response_serializer=message__transmission__pb2.FrameReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -95,5 +111,22 @@ class MessageTransmission(object):
         return grpc.experimental.unary_unary(request, target, '/MessageTransmission/get_queue_info',
             message__transmission__pb2.InfoRequest.SerializeToString,
             message__transmission__pb2.InfoReply.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def frame_processor(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/MessageTransmission/frame_processor',
+            message__transmission__pb2.FrameRequest.SerializeToString,
+            message__transmission__pb2.FrameReply.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

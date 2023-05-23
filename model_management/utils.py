@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from loguru import logger
 from mapcalc import calculate_map
-from inferencer.model_info import classes
+from model_management.model_info import classes
 
 
 def cal_iou(a, b):

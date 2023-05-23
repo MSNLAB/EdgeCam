@@ -33,6 +33,17 @@ class MessageTransmissionServicer(message_transmission_pb2_grpc.MessageTransmiss
 
         return reply
 
+    def frame_processor(self, request, context):
+        base64_frame = request.frame
+        frame_shape = tuple(int(s) for s in request.new_shape[1:-1].split(","))
+        frame = base64_to_cv2(base64_frame).reshape(frame_shape)
+        reply = message_transmission_pb2.FrameReply(
+            response=str(1),
+            frame_shape=frame_shape,
+        )
+        return reply
+
+
     def get_queue_info(self, request, context):
         self.queue_info['{}'.format(request.source_edge_id)] = request.local_length
         reply = message_transmission_pb2.InfoReply(

@@ -3,17 +3,16 @@ import torch
 import os
 import numpy as np
 from loguru import logger
-from torch import nn
 from torch.utils.data import DataLoader
-
-from inferencer.detection_dataset import TrafficDataset
-from inferencer.detection_metric import RetrainMetric
-from inferencer.model_info import model_lib, COCO_INSTANCE_CATEGORY_NAMES, classes
+from torchvision.models.detection.backbone_utils import*
+from model_management.detection_dataset import TrafficDataset
+from model_management.detection_metric import RetrainMetric
+from model_management.model_info import model_lib, COCO_INSTANCE_CATEGORY_NAMES, classes
 from PIL import Image
 from torchvision import transforms
 from torchvision.models.detection import *
 
-from inferencer.utils import get_offloading_region, get_offloading_image
+from model_management.utils import get_offloading_region, get_offloading_image
 
 def _collate_fn(batch):
     return tuple(zip(*batch))
@@ -21,13 +20,15 @@ def _collate_fn(batch):
 class Object_Detection:
     def __init__(self, config, type):
         self.type = type
+        self.config = config
         self.init_model_flag = False
         if type == 'small inference':
             self.model_name = config.small_model_name
             self.init_model_flag = True
         else:
             self.model_name = config.large_model_name
-        self.model = self.load_model()
+        self.model = None
+        self.load_model()
         self.threshold_low = 0.2
         self.threshold_high = 0.6
 
@@ -37,38 +38,40 @@ class Object_Detection:
             weight_files_path = \
                 os.path.join(weight_folder, model_lib[self.model_name]['model_path'])
             weight_load = torch.load(weight_files_path)
-            model = eval(self.model_name)(pretrained_backbone=False, pretrained=False)
-            model.load_state_dict(weight_load)
+            self.model = eval(self.model_name)(pretrained_backbone=False, pretrained=False)
+            self.model.load_state_dict(weight_load)
             if self.init_model_flag:
                 self.init_model()
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            model.to(device)
-            model.eval()
-            return model
-        else:
-            return None
+            self.model.to(device)
+            self.model.eval()
 
     def init_model(self):
+        logger.debug("init_model")
         for param in self.model.parameters():
             param.requires_grad = False
         for param in self.model.roi_heads.parameters():
+            logger.debug("roi")
             param.requires_grad = True
 
         for module in self.model.roi_heads.modules():
+            logger.debug("{}".format(module))
             if isinstance(module, nn.Conv2d):
+                logger.debug("conv")
                 nn.init.normal_(module.weight, std=0.01)
                 if module.bias is not None:
                     nn.init.constant_(module.bias, 0)
             elif isinstance(module, nn.BatchNorm2d):
+                logger.debug("batch")
                 nn.init.constant_(module.weight, 1)
                 nn.init.constant_(module.bias, 0)
-        torch.save(self.model.state_dict(), "tmp_model.pth")
+        torch.save(self.model.state_dict(), "./model_management/tmp_model.pth")
 
     def retrain(self):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         tmp_model = eval(self.model_name)(pretrained_backbone=False, pretrained=False)
-        state_dict = torch.load("tmp_model.pth", map_location=device)
+        state_dict = torch.load("./model_management/tmp_model.pth", map_location=device)
         tmp_model.load_state_dict(state_dict)
         for param in self.model.parameters():
             param.requires_grad = False
@@ -80,7 +83,7 @@ class Object_Detection:
         tr_metric = RetrainMetric()
 
         # 训练设置
-        num_epoch = 10
+        num_epoch = self.config.retrain.num_epoch
         roi_parameters = [p for p in tmp_model.parameters() if p.requires_grad]
         optimizer = torch.optim.SGD(roi_parameters, lr=0.005, momentum=0.9, weight_decay=0.0005)
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
@@ -103,8 +106,8 @@ class Object_Detection:
                 tr_metric.update(loss_dict, losses)
             # Update the learning rate
             lr_scheduler.step()
-        torch.save(tmp_model.state_dict(), "tmp_model.pth")
-        state_dict = torch.load("tmp_model.pth", map_location=device)
+        torch.save(tmp_model.state_dict(), "./model_management/tmp_model.pth")
+        state_dict = torch.load("./model_management/tmp_model.pth", map_location=device)
         self.model.load_state_dict(state_dict)
         self.model.eval()
 
@@ -149,7 +152,7 @@ class Object_Detection:
         img = img.to(device)
         #get the inference result
         res = self.model([img])
-
+        logger.debug("res {}".format(res))
         if torch.cuda.is_available():
             prediction_class = list(res[0]['labels'].cuda().data.cpu().numpy())
             prediction_boxes = [[i[0], i[1], i[2], i[3]] for i in list(res[0]['boxes'].detach().cpu().numpy())]

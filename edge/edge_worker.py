@@ -22,7 +22,7 @@ from grpc_server.rpc_server import MessageTransmissionServicer
 
 from tools.convert_tool import cv2_to_base64
 from tools.preprocess import frame_resize
-from inferencer.object_detection import Object_Detection
+from model_management.object_detection import Object_Detection
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from tools.video_processor import VideoProcessor
@@ -105,7 +105,7 @@ class EdgeWorker:
         data = (
             task.frame_index,
             datetime.fromtimestamp(task.start_time).strftime('%Y-%m-%d %H:%M:%S.%f'),
-            "",
+            None,
             "",
             "",)
         self.database.insert_data(self.edge_id, data)
@@ -120,7 +120,17 @@ class EdgeWorker:
             while True:
                 # get task from cache
                 task = self.frame_cache.get(block=True)
-                frame = task.frame
+
+                # Create an entry for the task in the database table
+                data = (
+                    task.frame_index,
+                    datetime.fromtimestamp(task.start_time).strftime('%Y-%m-%d %H:%M:%S.%f'),
+                    None,
+                    "",
+                    "",)
+                self.database.insert_data(self.edge_id, data)
+
+                frame = task.frame_edge
                 self.frame_feature = self.edge_processor.get_frame_feature(frame)
                 # calculate and accumulate the difference
                 self.diff += self.edge_processor.cal_frame_diff(self.frame_feature, self.pre_frame_feature)
@@ -133,6 +143,7 @@ class EdgeWorker:
                 else:
                     task.end_time = time.time()
                     row = self.database.select_one_result(self.edge_id, task.frame_index)
+                    logger.debug(row)
                     if row[4] == 'FINISHED':
                         self.key_task.state = TASK_STATE.FINISHED
                         result_dict = eval(row[3])
@@ -178,7 +189,9 @@ class EdgeWorker:
             # get the query image and the small inference result
             offloading_image, detection_boxes, detection_class, detection_score \
                 = self.small_object_detection.small_inference(current_frame)
-            # write to cache, [frame, annotation]
+            logger.debug("img{}, box{}, cls{}, score{}".format
+                         (offloading_image,detection_boxes,detection_class,detection_score))
+            # collect data for retrain
             if self.collect_flag:
                 self.collect_data(current_task, current_frame ,detection_boxes, detection_class, detection_score)
 
@@ -296,16 +309,14 @@ class EdgeWorker:
                 logger.info(str(res))
 
     #
-    def collect_data(self, current_task, current_frame ,detection_boxes, detection_class, detection_score):
+    def collect_data(self, task, frame ,detection_boxes, detection_class, detection_score):
         self.select_index = []
-        cv2.imwrite(os.path.join(self.config.cache_path, str(current_task.index) + '.jpg'), current_frame)
-        self.avg_scores.append({current_task.index:np.mean(detection_score)})
+        cv2.imwrite(os.path.join(self.config.retrain.cache_path, str(task.frame_index) + '.jpg'), frame)
+        self.avg_scores.append({task.frame_index:np.mean(detection_score)})
+        self.cache_count += 1
         for score, label, box in zip(detection_score, detection_class, detection_boxes):
-            self.cache_count += 1
-            score = score.cpu().detach().item()
-            label = label.cpu().detach().item()
-            box = box.cpu().detach().tolist()
-            self.pred_res.append((current_task.index, label, box[0], box[1], box[2], box[3], score))
+            logger.debug("score {}, lable {}, box {}".format(score, label, box))
+            self.pred_res.append((task.frame_index, label, box[0], box[1], box[2], box[3], score))
             if self.cache_count >= 100:
                 smallest_elements = sorted(self.avg_scores, key=lambda d: list(d.values())[0])[:10]
                 self.select_index = [list(d.keys())[0] for d in smallest_elements]
@@ -319,20 +330,34 @@ class EdgeWorker:
                 self.collect_flag = False
                 self.cache_count = 0
 
-    # 4. send to cloud, get ground truth
-    # 5. retrain
+    # send to cloud, get ground truth
+    def get_cloud_target(self, frame):
+        frame_request = message_transmission_pb2.FrameRequest(
+            frame = frame,
+            frame_shape=frame.shape,
+        )
+        try:
+            channel = grpc.insecure_channel(self.config.server_ip)
+            stub = message_transmission_pb2_grpc.MessageTransmissionStub(channel)
+            res = stub.frame_processor(frame_request)
+        except Exception as e:
+            logger.exception("the cloud can not reply, {}".format( e))
+        else:
+            logger.info(str(res))
+
+    # retrain
     def retrain_worker(self):
         while self.retrain_flag:
             self.annotations = []
             for index in self.select_index:
                 path = os.path.join(self.config.cache_path, index, '.jpg')
                 frame = cv2.imread(path)
-                target_res = get_cloud_target(frame)
+                target_res = self.get_cloud_target(frame)
                 for score, label, box in zip(target_res['scores'], target_res['labels'], target_res['boxes']):
                     score = score.cpu().detach().item()
                     label = label.cpu().detach().item()
                     box = box.cpu().detach().tolist()
-                    if score >= 0.20:
+                    if score >= 0.60:
                         self.annotations.append(
                             (index, label, box[0], box[1],
                              box[2], box[3], score)
@@ -346,7 +371,15 @@ class EdgeWorker:
             pass
 
 
-
+    def start_edge_server(self):
+        logger.info("edge {} server is starting".format(self.edge_id))
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
+        message_transmission_pb2_grpc.add_MessageTransmissionServicer_to_server(
+            MessageTransmissionServicer(self.local_queue, self.edge_id, self.queue_info), server)
+        server.add_insecure_port('[::]:50050')
+        server.start()
+        logger.success("edge {} server is listening".format(self.edge_id))
+        server.wait_for_termination()
 
 
     def decision_worker(self, task):
