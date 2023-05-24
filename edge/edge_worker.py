@@ -327,9 +327,9 @@ class EdgeWorker:
         self.cache_count += 1
         for score, label, box in zip(detection_score, detection_class, detection_boxes):
             self.pred_res.append((task.frame_index, label, box[0], box[1], box[2], box[3], score))
-            if self.cache_count >= 10:
+            if self.cache_count >= 5:
                 logger.debug("enough")
-                smallest_elements = sorted(self.avg_scores, key=lambda d: list(d.values())[0])[:5]
+                smallest_elements = sorted(self.avg_scores, key=lambda d: list(d.values())[0])[:2]
                 self.select_index = [list(d.keys())[0] for d in smallest_elements]
                 print(self.select_index)
 
@@ -346,15 +346,17 @@ class EdgeWorker:
         encoded_image = cv2_to_base64(frame)
         frame_request = message_transmission_pb2.FrameRequest(
             frame = encoded_image,
-            frame_shape=frame.shape,
+            frame_shape=str(frame.shape),
         )
         try:
             channel = grpc.insecure_channel(self.config.server_ip)
             stub = message_transmission_pb2_grpc.MessageTransmissionStub(channel)
             res = stub.frame_processor(frame_request)
+            logger.debug("res{}".format(res))
             result_dict = eval(res.response)
+            logger.debug("res{}".format(result_dict))
         except Exception as e:
-            logger.exception("the cloud can not reply, {}".format( e))
+            logger.exception("the cloud can not reply, {}".format(e))
         else:
             logger.info(str(res))
         return result_dict
@@ -371,19 +373,13 @@ class EdgeWorker:
                     target_res = self.get_cloud_target(frame)
                     logger.debug("get target {}".format(target_res))
                     for score, label, box in zip(target_res['scores'], target_res['labels'], target_res['boxes']):
-                        score = score.cpu().detach().item()
-                        label = label.cpu().detach().item()
-                        box = box.cpu().detach().tolist()
                         if score >= 0.60:
-                            self.annotations.append(
-                                (index, label, box[0], box[1],
-                                 box[2], box[3], score)
-                            )
+                            self.annotations.append((index, label, box[0], box[1], box[2], box[3], score))
                 if len(self.annotations):
                     np.savetxt(self.config.retrain.annotation_path, self.annotations,
                                fmt=['%d', '%d', '%f', '%f', '%f', '%f', '%f'], delimiter=',')
 
-                self.small_object_detection.retrain()
+                self.small_object_detection.retrain(self.config.retrain.cache_path, self.config.retrain.annotation_path, self.select_index)
                 self.collect_flag = True
                 self.retrain_flag = False
                 clear_folder(self.config.retrain.cache_path)

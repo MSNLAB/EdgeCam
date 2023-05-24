@@ -1,3 +1,5 @@
+from loguru import logger
+
 from edge.task import Task
 from tools.convert_tool import base64_to_cv2
 from grpc_server import message_transmission_pb2, message_transmission_pb2_grpc
@@ -44,7 +46,7 @@ class MessageTransmissionServicer(message_transmission_pb2_grpc.MessageTransmiss
 
     def frame_processor(self, request, context):
         base64_frame = request.frame
-        frame_shape = tuple(int(s) for s in request.new_shape[1:-1].split(","))
+        frame_shape = tuple(int(s) for s in request.frame_shape[1:-1].split(","))
         frame = base64_to_cv2(base64_frame).reshape(frame_shape)
         pred_boxes, pred_class, pred_score = self.large_object_detection.large_inference(frame)
         res_dict = {
@@ -54,7 +56,7 @@ class MessageTransmissionServicer(message_transmission_pb2_grpc.MessageTransmiss
         }
         reply = message_transmission_pb2.FrameReply(
             response=str(res_dict),
-            frame_shape=frame_shape,
+            frame_shape=str(frame_shape),
         )
         return reply
 

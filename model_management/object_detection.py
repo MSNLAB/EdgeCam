@@ -1,3 +1,5 @@
+import threading
+
 import cv2
 import torch
 import os
@@ -17,11 +19,15 @@ from model_management.utils import get_offloading_region, get_offloading_image
 def _collate_fn(batch):
     return tuple(zip(*batch))
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+logger.debug(device)
+
 class Object_Detection:
     def __init__(self, config, type):
         self.type = type
         self.config = config
         self.init_model_flag = False
+        self.model_lock = threading.Lock()
         if type == 'small inference':
             self.model_name = config.small_model_name
             self.init_model_flag = True
@@ -42,7 +48,7 @@ class Object_Detection:
             self.model.load_state_dict(weight_load)
             if self.init_model_flag:
                 self.init_model()
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
             self.model.to(device)
             self.model.eval()
 
@@ -51,24 +57,16 @@ class Object_Detection:
         for param in self.model.parameters():
             param.requires_grad = False
         for param in self.model.roi_heads.parameters():
-            logger.debug("roi")
             param.requires_grad = True
 
         for module in self.model.roi_heads.modules():
-            logger.debug("{}".format(module))
-            if isinstance(module, nn.Conv2d):
-                logger.debug("conv")
-                nn.init.normal_(module.weight, std=0.01)
+            if isinstance(module, torch.nn.Linear):
+                torch.nn.init.kaiming_normal_(module.weight)
                 if module.bias is not None:
-                    nn.init.constant_(module.bias, 0)
-            elif isinstance(module, nn.BatchNorm2d):
-                logger.debug("batch")
-                nn.init.constant_(module.weight, 1)
-                nn.init.constant_(module.bias, 0)
+                    torch.nn.init.constant_(module.bias, 0)
         torch.save(self.model.state_dict(), "./model_management/tmp_model.pth")
 
-    def retrain(self):
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    def retrain(self, path, anno_path, select_index):
 
         tmp_model = eval(self.model_name)(pretrained_backbone=False, pretrained=False)
         state_dict = torch.load("./model_management/tmp_model.pth", map_location=device)
@@ -78,7 +76,7 @@ class Object_Detection:
         for param in self.model.roi_heads.parameters():
             param.requires_grad = True
 
-        dataset = TrafficDataset(root="./retrain_data")
+        dataset = TrafficDataset(root=path, anno_path = anno_path, select_index = select_index)
         data_loader = DataLoader(dataset=dataset, batch_size=2, collate_fn=_collate_fn, )
         tr_metric = RetrainMetric()
 
@@ -91,12 +89,8 @@ class Object_Detection:
         for epoch in range(num_epoch):
             tmp_model.train()
             for images, targets in tr_metric.log_iter(epoch, num_epoch, data_loader):
-                print("pre tar {}".format(targets))
-                for t in targets:
-                    print("t {}".format(t))
                 images = list(image.to(device) for image in images)
                 targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-                print(targets)
                 with torch.cuda.amp.autocast():
                     loss_dict = tmp_model(images, targets)
                     losses = sum(loss for loss in loss_dict.values())
@@ -108,35 +102,37 @@ class Object_Detection:
             lr_scheduler.step()
         torch.save(tmp_model.state_dict(), "./model_management/tmp_model.pth")
         state_dict = torch.load("./model_management/tmp_model.pth", map_location=device)
-        self.model.load_state_dict(state_dict)
+        with self.model_lock:
+            self.model.load_state_dict(state_dict)
         self.model.eval()
 
 
     def small_inference(self, img):
+        with self.model_lock:
             pred_boxes, pred_class, pred_score = self.get_model_prediction(img, self.threshold_low)
-            if pred_boxes == None:
-                return None, None, None, None
-            #filter high confidence region as the detection result
-            try:
-                prediction_index = [pred_score.index(x) for x in pred_score if x > self.threshold_high][-1]
-            except IndexError:
-                detection_boxes = None
-                detection_class = None
-                detection_score = None
-            else:
-                detection_boxes = pred_boxes[:prediction_index + 1]
-                detection_class = pred_class[:prediction_index + 1]
-                detection_score = pred_score[:prediction_index + 1]
-            #split into high and low confidence region
-            high_detections = detection_boxes
-            low_regions = pred_boxes
-            #get the inferencer that need to query
-            offloading_region = get_offloading_region(high_detections, low_regions, img.shape)
-            if len(offloading_region) == 0:
-                offloading_image = None
-            else:
-                offloading_image = get_offloading_image(offloading_region, img)
-            return offloading_image, detection_boxes, detection_class, detection_score
+        if pred_boxes == None:
+            return None, None, None, None
+        #filter high confidence region as the detection result
+        try:
+            prediction_index = [pred_score.index(x) for x in pred_score if x > self.threshold_high][-1]
+        except IndexError:
+            detection_boxes = None
+            detection_class = None
+            detection_score = None
+        else:
+            detection_boxes = pred_boxes[:prediction_index + 1]
+            detection_class = pred_class[:prediction_index + 1]
+            detection_score = pred_score[:prediction_index + 1]
+        #split into high and low confidence region
+        high_detections = detection_boxes
+        low_regions = pred_boxes
+        #get the inferencer that need to query
+        offloading_region = get_offloading_region(high_detections, low_regions, img.shape)
+        if len(offloading_region) == 0:
+            offloading_image = None
+        else:
+            offloading_image = get_offloading_image(offloading_region, img)
+        return offloading_image, detection_boxes, detection_class, detection_score
 
 
     def large_inference(self, img):
@@ -148,11 +144,9 @@ class Object_Detection:
         img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         transform = transforms.Compose([transforms.ToTensor()])
         img = transform(img)
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         img = img.to(device)
         #get the inference result
         res = self.model([img])
-        logger.debug("res {}".format(res))
         if torch.cuda.is_available():
             prediction_class = list(res[0]['labels'].cuda().data.cpu().numpy())
             prediction_boxes = [[i[0], i[1], i[2], i[3]] for i in list(res[0]['boxes'].detach().cpu().numpy())]
