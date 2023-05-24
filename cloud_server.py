@@ -85,7 +85,7 @@ class CloudServer:
         logger.info("cloud server is starting")
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
         message_transmission_pb2_grpc.add_MessageTransmissionServicer_to_server(
-            MessageTransmissionServicer(self.local_queue, self.server_id), server)
+            MessageTransmissionServicer(self.local_queue, self.server_id, self.large_object_detection), server)
         server.add_insecure_port('[::]:50051')
         server.start()
         logger.info("cloud server is listening")
