@@ -13,8 +13,8 @@ class DataBase:
         self.database_name = config.database_name
         self.table_desc = "CREATE TABLE `{}` " \
                                  "(`index` int NOT NULL, " \
-                                 "`start_time` timestamp(6)," \
-                                 "`end_time` timestamp(6), " \
+                                 "`start_time` double," \
+                                 "`end_time` double, " \
                                  "`result` TEXT, " \
                                  "`log` VARCHAR(255)," \
                                  "PRIMARY KEY(`index`)) ENGINE=InnoDB"
