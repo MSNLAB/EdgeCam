@@ -61,16 +61,23 @@ class EdgeWorker:
         self.key_task = None
         self.diff_processor = threading.Thread(target=self.diff_worker,)
         self.diff_processor.start()
+
+        # start the thread for edge server
+        #self.edge_server = threading.Thread(target=self.start_edge_server, )
+        #self.edge_server.start()
+
         # start the thread for local process
         self.local_processor = threading.Thread(target=self.local_worker,)
         self.local_processor.start()
 
         # start the thread for retrain process
         self.retrain_flag = False
-        self.collect_flag = True
+        self.collect_flag = False
         self.cache_count = 0
         self.retrain_processor = threading.Thread(target=self.retrain_worker,)
         self.retrain_processor.start()
+
+
 
         # start the thread pool for offload
         self.offloading_executor = futures.ThreadPoolExecutor(max_workers=config.offloading_max_worker,)
@@ -141,8 +148,11 @@ class EdgeWorker:
                 # Process the video frame greater than a certain threshold
                 if self.diff >= self.config.diff_thresh:
                     self.diff = 0.0
+                    self.key_task.send = True
                     self.key_task = task
                     self.decision_worker(task)
+                    if self.frame_cache.qsize() == 0:
+                        self.key_task.send = True
                 else:
                     task.end_time = time.time()
                     row = self.database.select_one_result(self.edge_id, self.key_task.frame_index)
@@ -157,6 +167,9 @@ class EdgeWorker:
                         self.update_table(task)
                     else:
                         self.key_task.ref_list.append(task)
+
+                    if self.frame_cache.qsize() == 0:
+                        self.key_task.send = True
 
         else:
             pass
@@ -225,22 +238,32 @@ class EdgeWorker:
                 self.ref_update(task)
                 logger.info('target not detected')
 
-    def offload_worker(self, current_task, destination_edge_id=None):
+    def offload_worker(self, task, destination_edge_id=None):
+        while True:
+            if task.send == True:
+                break
+            time.sleep(0.2)
+
         new_height = self.config.new_height
         qp = self.config.quality
         # offload to cloud
         if destination_edge_id is None:
-            frame_cloud = current_task.frame_cloud
-            assert frame_cloud != None
-            part_result_str = current_task.get_result()
 
+            frame_cloud = task.frame_cloud
+            assert frame_cloud is not None
+            detection_boxes, detection_class, detection_score = task.get_result()
+            if len(detection_boxes) != 0:
+                part_result = {'boxes': detection_boxes, 'lables': detection_class, 'scores': detection_score}
+            else:
+                part_result = ""
+            logger.debug("part_result {}".format(part_result))
             # offload to the cloud directly
-            if current_task.directly_cloud:
+            if task.directly_cloud:
                 new_frame = frame_resize(frame_cloud, new_height=new_height.directly_cloud)
                 encoded_image = cv2_to_base64(new_frame, qp=qp.directly_cloud)
             # The task from another edge node is offloaded to the cloud after local inference
-            elif current_task.other:
-                if current_task.frame_cloud.shape[0] < new_height.another_cloud:
+            elif task.other:
+                if task.frame_cloud.shape[0] < new_height.another_cloud:
                     logger.error("the new height can not larger than the height of current frame.")
                 new_frame = frame_resize(frame_cloud, new_height=new_height.another_cloud)
                 encoded_image = cv2_to_base64(new_frame, qp=qp.another_cloud)
@@ -249,18 +272,20 @@ class EdgeWorker:
                 new_frame = frame_resize(frame_cloud, new_height=new_height.local_cloud)
                 encoded_image = cv2_to_base64(new_frame, qp=qp.local_cloud)
 
+            logger.debug("to cloud ref_list {}".format(task.ref_list))
             ref_dict = {'index':[], 'start_time':[], 'end_time':[]}
-            for task in current_task.ref_list:
-                ref_dict['index'].append(task.frame_index)
-                ref_dict['start_time'].append(task.start_time)
-                ref_dict['end_time'].append(task.end_time)
+            for t in task.ref_list:
+                ref_dict['index'].append(t.frame_index)
+                ref_dict['start_time'].append(t.start_time)
+                ref_dict['end_time'].append(t.end_time)
+
             msg_request = message_transmission_pb2.MessageRequest(
                 source_edge_id=int(self.edge_id),
-                frame_index=int(current_task.frame_index),
-                start_time=str(current_task.start_time),
+                frame_index=int(task.frame_index),
+                start_time=str(task.start_time),
                 frame=encoded_image,
-                part_result=part_result_str,
-                raw_shape=str(current_task.raw_shape),
+                part_result=str(part_result),
+                raw_shape=str(task.raw_shape),
                 new_shape=str(new_frame.shape),
                 ref_list = str(ref_dict),
                 note="",
@@ -272,35 +297,35 @@ class EdgeWorker:
             except Exception as e:
                 logger.exception("the cloud can not reply, {}".format(e))
                 # put the task into local queue
-                if current_task.directly_cloud:
-                    current_task.edge_process = True
-                    self.local_queue.put(current_task, block=True)
+                if task.directly_cloud:
+                    task.edge_process = True
+                    self.local_queue.put(task, block=True)
                 # upload the result
                 else:
                     end_time = time.time()
-                    current_task.end_time = end_time
-                    self.update_table(current_task)
+                    task.end_time = end_time
+                    self.update_table(task)
             else:
                 logger.info(str(res))
         # to another edge
         else:
-            frame_edge = current_task.frame_edge
+            frame_edge = task.frame_edge
             new_frame = frame_resize(frame_edge, new_height=new_height.another)
             encoded_image = cv2_to_base64(new_frame, qp=qp.another)
 
             ref_dict = {'index': [], 'start_time': [], 'end_time': []}
-            for task in current_task.ref_list:
-                ref_dict['index'].append(task.frame_index)
-                ref_dict['start_time'].append(task.start_time)
-                ref_dict['end_time'].append(task.end_time)
+            for t in task.ref_list:
+                ref_dict['index'].append(t.frame_index)
+                ref_dict['start_time'].append(t.start_time)
+                ref_dict['end_time'].append(t.end_time)
 
             msg_request = message_transmission_pb2.MessageRequest(
                 source_edge_id=int(self.edge_id),
-                frame_index=int(current_task.frame_index),
-                start_time=str(current_task.start_time),
+                frame_index=int(task.frame_index),
+                start_time=str(task.start_time),
                 frame=encoded_image,
                 part_result="",
-                raw_shape=str(current_task.raw_shape),
+                raw_shape=str(task.raw_shape),
                 new_shape=str(new_frame.shape),
                 ref_list=str(ref_dict),
                 note="edge process",
@@ -313,23 +338,23 @@ class EdgeWorker:
                 res = stub.task_processor(msg_request)
             except Exception as e:
                 logger.exception("the edge id{}, ip {} can not reply, {}".format(destination_edge_id,destination_edge_ip,e))
-                self.local_queue.put(current_task, block=True)
+                self.local_queue.put(task, block=True)
             else:
                 logger.info(str(res))
 
     #
     def collect_data(self, task, frame ,detection_boxes, detection_class, detection_score):
-        logger.debug(self.cache_count)
         self.select_index = []
         creat_folder(self.config.retrain.cache_path)
         cv2.imwrite(os.path.join(self.config.retrain.cache_path, str(task.frame_index) + '.jpg'), frame)
         self.avg_scores.append({task.frame_index:np.mean(detection_score)})
         self.cache_count += 1
+        logger.debug("count {}".format(self.cache_count))
         for score, label, box in zip(detection_score, detection_class, detection_boxes):
             self.pred_res.append((task.frame_index, label, box[0], box[1], box[2], box[3], score))
-            if self.cache_count >= 5:
+            if self.cache_count >= 15:
                 logger.debug("enough")
-                smallest_elements = sorted(self.avg_scores, key=lambda d: list(d.values())[0])[:2]
+                smallest_elements = sorted(self.avg_scores, key=lambda d: list(d.values())[0])[:10]
                 self.select_index = [list(d.keys())[0] for d in smallest_elements]
                 print(self.select_index)
 
@@ -352,7 +377,6 @@ class EdgeWorker:
             channel = grpc.insecure_channel(self.config.server_ip)
             stub = message_transmission_pb2_grpc.MessageTransmissionStub(channel)
             res = stub.frame_processor(frame_request)
-            logger.debug("res{}".format(res))
             result_dict = eval(res.response)
             logger.debug("res{}".format(result_dict))
         except Exception as e:
@@ -379,10 +403,11 @@ class EdgeWorker:
                     np.savetxt(self.config.retrain.annotation_path, self.annotations,
                                fmt=['%d', '%d', '%f', '%f', '%f', '%f', '%f'], delimiter=',')
 
-                self.small_object_detection.retrain(self.config.retrain.cache_path, self.config.retrain.annotation_path, self.select_index)
+                self.small_object_detection.retrain(self.config.retrain.cache_path, self.config.retrain.annotation_path, self.select_index[:8])
+                self.small_object_detection.model_evaluation(self.config.retrain.cache_path,self.config.retrain.annotation_path,self.select_index[8:])
                 self.collect_flag = True
                 self.retrain_flag = False
-                clear_folder(self.config.retrain.cache_path)
+                #clear_folder(self.config.retrain.cache_path)
             time.sleep(1)
 
 
@@ -390,7 +415,7 @@ class EdgeWorker:
         logger.info("edge {} server is starting".format(self.edge_id))
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
         message_transmission_pb2_grpc.add_MessageTransmissionServicer_to_server(
-            MessageTransmissionServicer(self.local_queue, self.edge_id, self.queue_info), server)
+            MessageTransmissionServicer(self.local_queue, self.edge_id, self.small_object_detection ,self.queue_info), server)
         server.add_insecure_port('[::]:50050')
         server.start()
         logger.success("edge {} server is listening".format(self.edge_id))

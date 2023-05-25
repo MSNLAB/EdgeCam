@@ -1,6 +1,7 @@
 import threading
 
 import cv2
+import pandas as pd
 import torch
 import os
 import numpy as np
@@ -9,11 +10,11 @@ from torch.utils.data import DataLoader
 from torchvision.models.detection.backbone_utils import*
 from model_management.detection_dataset import TrafficDataset
 from model_management.detection_metric import RetrainMetric
-from model_management.model_info import model_lib, COCO_INSTANCE_CATEGORY_NAMES, classes
+from model_management.model_info import model_lib, COCO_INSTANCE_CATEGORY_NAMES, classes, annotation_cols
 from PIL import Image
 from torchvision import transforms
 from torchvision.models.detection import *
-
+from mapcalc import calculate_map
 from model_management.utils import get_offloading_region, get_offloading_image
 
 def _collate_fn(batch):
@@ -106,6 +107,37 @@ class Object_Detection:
             self.model.load_state_dict(state_dict)
         self.model.eval()
 
+    def model_evaluation(self,cache_path, annotation_path, select_index):
+        map = []
+
+        annotations_f = pd.read_csv(annotation_path, header=None, names=annotation_cols)
+        for _id in select_index:
+            logger.debug(_id)
+            path = os.path.join(cache_path, str(_id)+'.jpg')
+            frame = cv2.imread(path)
+            pred_boxes, pred_class, pred_score = self.get_model_prediction(frame, 0.6)
+            pred = {'labels':pred_class, 'boxes': pred_boxes, 'scores':pred_score}
+            annos = annotations_f[annotations_f['frame_index'] == _id]
+            target_boxes = []
+            target_labels = []
+            for _idx, _label in annos.iterrows():
+                label = _label['target_id']
+                if label != 0:
+                    x_min = _label['bbox_x1']
+                    y_min = _label['bbox_y1']
+                    x_max = _label['bbox_x2']
+                    y_max = _label['bbox_y2']
+                    target_boxes.append([x_min, y_min, x_max, y_max])
+                    target_labels.append(label)
+            target = {'labels':target_labels, 'boxes': target_boxes}
+
+            logger.debug("anno {}".format(target))
+            logger.debug("pred {}".format(pred))
+            cal_map = calculate_map(target, pred, 0.5)
+            logger.debug(cal_map)
+            map.append(cal_map)
+        map = np.mean(map)
+        logger.debug(map)
 
     def small_inference(self, img):
         with self.model_lock:

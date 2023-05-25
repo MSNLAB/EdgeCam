@@ -6,14 +6,14 @@ from grpc_server import message_transmission_pb2, message_transmission_pb2_grpc
 
 
 class MessageTransmissionServicer(message_transmission_pb2_grpc.MessageTransmissionServicer):
-    def __init__(self, local_queue, id, large_object_detection ,queue_info=None):
+    def __init__(self, local_queue, id, object_detection ,queue_info=None):
         self.local_queue = local_queue
         self.id = id
         self.queue_info = queue_info
-        self.large_object_detection = large_object_detection
+        self.object_detection = object_detection
 
     def task_processor(self, request, context):
-
+        logger.debug("task_processor")
         base64_frame = request.frame
         frame_shape = tuple(int(s) for s in request.new_shape[1:-1].split(","))
         frame = base64_to_cv2(base64_frame).reshape(frame_shape)
@@ -21,6 +21,7 @@ class MessageTransmissionServicer(message_transmission_pb2_grpc.MessageTransmiss
 
         task = Task(request.source_edge_id, request.frame_index, frame, float(request.start_time), raw_shape)
         ref_dict = eval(request.ref_list)
+        logger.debug(ref_dict)
         for i in range(len(ref_dict['index'])):
             index = ref_dict['index'][i]
             start_time = ref_dict['start_time'][i]
@@ -28,12 +29,21 @@ class MessageTransmissionServicer(message_transmission_pb2_grpc.MessageTransmiss
             ref_task = Task(request.source_edge_id, index, None, start_time, None)
             ref_task.end_time = end_time
             task.ref_list.append(ref_task)
+        logger.debug(task.ref_list)
         task.other = True
+
         if request.part_result != "":
+            logger.debug("put1")
             part_result = eval(request.part_result)
-            task.add_result(part_result['boxes'], part_result['labels'], part_result['scores'])
+            if len(request.part_result['boxes']) != 0:
+                logger.debug("put2")
+                task.add_result(part_result['boxes'], part_result['labels'], part_result['scores'])
+            logger.debug("put3")
+
         if request.note == "edge process":
             task.edge_process = True
+
+
         self.local_queue.put(task, block=True)
 
         reply = message_transmission_pb2.MessageReply(
@@ -48,7 +58,7 @@ class MessageTransmissionServicer(message_transmission_pb2_grpc.MessageTransmiss
         base64_frame = request.frame
         frame_shape = tuple(int(s) for s in request.frame_shape[1:-1].split(","))
         frame = base64_to_cv2(base64_frame).reshape(frame_shape)
-        pred_boxes, pred_class, pred_score = self.large_object_detection.large_inference(frame)
+        pred_boxes, pred_class, pred_score = self.object_detection.large_inference(frame)
         res_dict = {
             'boxes': pred_boxes,
             'labels': pred_class,

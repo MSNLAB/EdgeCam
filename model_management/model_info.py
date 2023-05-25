@@ -30,3 +30,7 @@ classes = {
     "persons": [1, 2, 4],
     "roadside-objects": [10, 11, 13, 14]
 }
+
+
+annotation_cols = ('frame_index', 'target_id', 'bbox_x1', 'bbox_y1',
+                   'bbox_x2', 'bbox_y2', 'score', 'object_category',)

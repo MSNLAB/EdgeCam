@@ -41,7 +41,7 @@ class CloudServer:
     def cloud_local(self):
         while True:
             task = self.local_queue.get(block=True)
-            task.set_frame_cloud(task.frame_edge)
+            task.frame_cloud = task.frame_edge
             frame = task.frame_cloud
             high_boxes, high_class, high_score = self.large_object_detection.large_inference(frame)
             # scale the small result
@@ -58,15 +58,16 @@ class CloudServer:
 
 
     def ref_update(self, task):
+        detection_boxes, detection_class, detection_score = task.get_result()
         for ref_task in task.ref_list:
-            detection_boxes, detection_class, detection_score = task.get_result()
             ref_task.add_result(detection_boxes, detection_class, detection_score)
             ref_task.state = TASK_STATE.FINISHED
-            self.update_table(task)
+            self.update_table(ref_task)
 
 
     def update_table(self, task):
         detection_boxes, detection_class, detection_score = task.get_result()
+        state = "Finished" if task.state == TASK_STATE.FINISHED else ""
         result = {
             'lables': detection_class,
             'boxes': detection_boxes,
@@ -74,11 +75,11 @@ class CloudServer:
         }
         # upload the result to database
         data = (
-            datetime.fromtimestamp(task.end_time).strftime('%Y-%m-%d %H:%M:%S.%f'),
+            task.end_time,
             str(result),
-            "",
+            state,
             task.frame_index)
-        self.database.update_data(self.edge_id, data)
+        self.database.update_data(task.edge_id, data)
 
 
     def start_server(self):

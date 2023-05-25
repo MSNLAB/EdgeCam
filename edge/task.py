@@ -1,4 +1,4 @@
-
+from loguru import logger
 
 
 class Task:
@@ -14,6 +14,7 @@ class Task:
         self.other = False
         self.directly_cloud = False
         self.edge_process = False
+        self.send = False
 
         self.detection_boxes = []
         self.detection_class = []

@@ -2,7 +2,7 @@ client:
  # the source video
  source:
   video_path: ./video_data/dayroad.mp4
-  max_count: 120
+  max_count: 80
   rtsp:
    flag: False
    account: your account
@@ -25,7 +25,7 @@ client:
  frame_cache_maxsize: 100
  small_model_name: fasterrcnn_mobilenet_v3_large_fpn
  #select the offloading policy
- policy: Edge-Cloud-Threshold
+ policy: Edge-Local
  #change frame resolution using frame new height
  new_height:
   #offload to another edge node [1080, 720], default 720
@@ -47,7 +47,7 @@ client:
   #The task from another edge node is offloaded to the cloud after local inference, default 85.
   another_cloud: 90
  #server_ip
- server_ip: '127.0.0.1'
+ server_ip: '127.0.0.1:50051'
  #edge nodes
  edge_id: 1
  destinations: {'id': [], 'ip':[]}
@@ -55,12 +55,22 @@ client:
  database:
   connection: { 'user': 'root', 'password': 'root', 'host': '127.0.0.1', 'raise_on_warnings': True }
   database_name: 'mydatabase'
+ # retrain
+ retrain:
+  num_epoch: 4
+  cache_path: './cache/frames'
+  pred_res_path: './cache/pred_res.txt'
+  annotation_path: './cache/annotation.txt'
 
 server:
  server_id: 0
+ edge_ids: [1]
  large_model_name: fasterrcnn_resnet50_fpn
  #the queue maxsize
  local_queue_maxsize: 10
  data_queue_maxsize: 10
-
+ #database config
+ database:
+  connection: { 'user': 'root', 'password': 'root', 'host': '127.0.0.1', 'raise_on_warnings': True }
+  database_name: 'mydatabase'
 
