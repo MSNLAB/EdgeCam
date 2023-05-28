@@ -54,15 +54,6 @@ class CloudServer:
             # upload the result to database
             task.state = TASK_STATE.FINISHED
             self.update_table(task)
-            self.ref_update(task)
-
-
-    def ref_update(self, task):
-        detection_boxes, detection_class, detection_score = task.get_result()
-        for ref_task in task.ref_list:
-            ref_task.add_result(detection_boxes, detection_class, detection_score)
-            ref_task.state = TASK_STATE.FINISHED
-            self.update_table(ref_task)
 
 
     def update_table(self, task):

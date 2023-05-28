@@ -20,16 +20,6 @@ class MessageTransmissionServicer(message_transmission_pb2_grpc.MessageTransmiss
         raw_shape = tuple(int(s) for s in request.raw_shape[1:-1].split(","))
 
         task = Task(request.source_edge_id, request.frame_index, frame, float(request.start_time), raw_shape)
-        ref_dict = eval(request.ref_list)
-        logger.debug(ref_dict)
-        for i in range(len(ref_dict['index'])):
-            index = ref_dict['index'][i]
-            start_time = ref_dict['start_time'][i]
-            end_time = ref_dict['end_time'][i]
-            ref_task = Task(request.source_edge_id, index, None, start_time, None)
-            ref_task.end_time = end_time
-            task.ref_list.append(ref_task)
-        logger.debug(task.ref_list)
         task.other = True
 
         if request.part_result != "":

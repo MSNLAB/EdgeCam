@@ -67,7 +67,7 @@ class Object_Detection:
                     torch.nn.init.constant_(module.bias, 0)
         torch.save(self.model.state_dict(), "./model_management/tmp_model.pth")
 
-    def retrain(self, path, anno_path, select_index):
+    def retrain(self, path, select_index):
 
         tmp_model = eval(self.model_name)(pretrained_backbone=False, pretrained=False)
         state_dict = torch.load("./model_management/tmp_model.pth", map_location=device)
@@ -77,7 +77,7 @@ class Object_Detection:
         for param in self.model.roi_heads.parameters():
             param.requires_grad = True
 
-        dataset = TrafficDataset(root=path, anno_path = anno_path, select_index = select_index)
+        dataset = TrafficDataset(root=path, select_index = select_index)
         data_loader = DataLoader(dataset=dataset, batch_size=2, collate_fn=_collate_fn, )
         tr_metric = RetrainMetric()
 
@@ -92,9 +92,8 @@ class Object_Detection:
             for images, targets in tr_metric.log_iter(epoch, num_epoch, data_loader):
                 images = list(image.to(device) for image in images)
                 targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-                with torch.cuda.amp.autocast():
-                    loss_dict = tmp_model(images, targets)
-                    losses = sum(loss for loss in loss_dict.values())
+                loss_dict = tmp_model(images, targets)
+                losses = sum(loss for loss in loss_dict.values())
                 optimizer.zero_grad()
                 losses.backward()
                 optimizer.step()
@@ -107,15 +106,16 @@ class Object_Detection:
             self.model.load_state_dict(state_dict)
         self.model.eval()
 
-    def model_evaluation(self,cache_path, annotation_path, select_index):
+    def model_evaluation(self,cache_path, select_index):
         map = []
-
+        frame_path = os.path.join(cache_path, 'frames')
+        annotation_path = os.path.join(cache_path, 'annotation.txt')
         annotations_f = pd.read_csv(annotation_path, header=None, names=annotation_cols)
         for _id in select_index:
             logger.debug(_id)
-            path = os.path.join(cache_path, str(_id)+'.jpg')
+            path = os.path.join(frame_path, str(_id)+'.jpg')
             frame = cv2.imread(path)
-            pred_boxes, pred_class, pred_score = self.get_model_prediction(frame, 0.6)
+            pred_boxes, pred_class, pred_score = self.get_model_prediction(frame, self.threshold_high)
             pred = {'labels':pred_class, 'boxes': pred_boxes, 'scores':pred_score}
             annos = annotations_f[annotations_f['frame_index'] == _id]
             target_boxes = []
@@ -130,9 +130,6 @@ class Object_Detection:
                     target_boxes.append([x_min, y_min, x_max, y_max])
                     target_labels.append(label)
             target = {'labels':target_labels, 'boxes': target_boxes}
-
-            logger.debug("anno {}".format(target))
-            logger.debug("pred {}".format(pred))
             cal_map = calculate_map(target, pred, 0.5)
             logger.debug(cal_map)
             map.append(cal_map)

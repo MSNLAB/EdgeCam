@@ -9,17 +9,18 @@ class Task:
         self.start_time = start_time
         self.raw_shape = raw_shape
         self.state = None
+        self.ref = None
         self.end_time = None
         self.frame_cloud = None
         self.other = False
         self.directly_cloud = False
         self.edge_process = False
-        self.send = False
+
 
         self.detection_boxes = []
         self.detection_class = []
         self.detection_score = []
-        self.ref_list = []
+
 
     def add_result(self, detection_boxes, detection_class, detection_score):
         if detection_boxes is not None:

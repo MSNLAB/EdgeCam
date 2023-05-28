@@ -30,9 +30,9 @@ class DetectionDataset(Dataset):
 
 
 class TrafficDataset(DetectionDataset):
-    def __init__(self, root=None, anno_path=None, select_index=None):
+    def __init__(self, root=None, select_index=None):
         self.root = root
-        frames = collect_frames(root, anno_path, select_index)
+        frames = collect_frames(root, select_index)
         super(TrafficDataset, self).__init__(frames)
 
 
@@ -40,12 +40,12 @@ class TrafficDataset(DetectionDataset):
 annotation_cols = ('frame_index', 'target_id', 'bbox_x1', 'bbox_y1',
                    'bbox_x2', 'bbox_y2', 'score', 'object_category',)
 
-def collect_frames(root, anno_path, select_index):
+def collect_frames(root, select_index):
     frames = []
-    frame_path = root
+    frame_path = os.path.join(root, 'frames')
     frame_names = list(os.listdir(frame_path))
 
-    annotation_path = anno_path
+    annotation_path = os.path.join(root, 'annotation.txt')
     annotations = pd.read_csv(annotation_path, header=None, names=annotation_cols)
     logger.debug(frames)
     for frame_name in frame_names:

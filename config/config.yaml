@@ -2,7 +2,7 @@ client:
  # the source video
  source:
   video_path: ./video_data/dayroad.mp4
-  max_count: 80
+  max_count: 120
   rtsp:
    flag: False
    account: your account
@@ -50,7 +50,7 @@ client:
  server_ip: '127.0.0.1:50051'
  #edge nodes
  edge_id: 1
- destinations: {'id': [], 'ip':[]}
+ destinations: {'id': [2], 'ip':['127.0.0.1:50050']}
  #database config
  database:
   connection: { 'user': 'root', 'password': 'root', 'host': '127.0.0.1', 'raise_on_warnings': True }
@@ -58,9 +58,9 @@ client:
  # retrain
  retrain:
   num_epoch: 4
-  cache_path: './cache/frames'
-  pred_res_path: './cache/pred_res.txt'
-  annotation_path: './cache/annotation.txt'
+  cache_path: './cache'
+  collect_num: 20
+  select_num: 20
 
 server:
  server_id: 0
