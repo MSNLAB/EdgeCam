@@ -15,13 +15,14 @@ from loguru import logger
 from database.database import DataBase
 from difference.diff import DiffProcessor
 from edge.info import TASK_STATE
+from edge.resample import history_sample, annotion_process
 from edge.task import Task
 from edge.transmit import get_cloud_target
 from grpc_server import message_transmission_pb2_grpc, message_transmission_pb2
 from grpc_server.rpc_server import MessageTransmissionServicer
 
 from tools.convert_tool import cv2_to_base64
-from tools.file_op import clear_folder, creat_folder
+from tools.file_op import clear_folder, creat_folder, sample_files
 from tools.preprocess import frame_resize
 from model_management.object_detection import Object_Detection
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -53,53 +54,37 @@ class EdgeWorker:
         self.avg_scores = []
         self.select_index = []
         self.annotations = []
-        # read video
-        self.video_reader = threading.Thread(target=self.video_read,)
-        self.video_reader.start()
+
         # start the thread for diff
         self.diff = 0
         self.key_task = None
-        self.diff_processor = threading.Thread(target=self.diff_worker,)
+        self.diff_processor = threading.Thread(target=self.diff_worker,daemon=True)
         self.diff_processor.start()
 
         # start the thread for edge server
-        #self.edge_server = threading.Thread(target=self.start_edge_server, )
+        #self.edge_server = threading.Thread(target=self.start_edge_server, daemon=True)
         #self.edge_server.start()
 
         # start the thread for local process
-        self.local_processor = threading.Thread(target=self.local_worker,)
+        self.local_processor = threading.Thread(target=self.local_worker,daemon=True)
         self.local_processor.start()
 
         # start the thread for retrain process
         self.retrain_flag = False
         self.collect_flag = True
         self.cache_count = 0
-        self.retrain_processor = threading.Thread(target=self.retrain_worker,)
+
+        self.use_history = True
+        self.test_only = False
+        self.retrain_no = 0
+
+        self.retrain_processor = threading.Thread(target=self.retrain_worker,daemon=True)
         self.retrain_processor.start()
 
         # start the thread pool for offload
         self.offloading_executor = futures.ThreadPoolExecutor(max_workers=config.offloading_max_worker,)
 
-    def video_read(self):
-        with VideoProcessor(self.config.source) as video:
-            video_fps = video.fps
-            logger.info("the video fps is {}".format(video_fps))
-            index = 0
-            if self.config.interval == 0:
-                logger.error("the interval error")
-                sys.exit(1)
-            logger.info("Take the frame interval is {}".format(self.config.interval))
-            while True:
-                frame = next(video)
-                if frame is None:
-                    logger.info("the video finished")
-                    break
-                index += 1
-                if index % self.config.interval == 0:
-                    start_time = time.time()
-                    task = Task(self.edge_id, index, frame, start_time, frame.shape)
-                    self.frame_cache.put(task, block=True)
-                    time.sleep((self.config.interval * 1.0) / video_fps)
+
 
 
     def diff_worker(self):
@@ -110,7 +95,6 @@ class EdgeWorker:
             self.pre_frame_feature = self.edge_processor.get_frame_feature(frame)
             self.key_task = task
             # Create an entry for the task in the database table
-            logger.debug("start time {}".format(task.start_time))
             data = (
                 task.frame_index,
                 task.start_time,
@@ -150,9 +134,6 @@ class EdgeWorker:
                     task.ref = self.key_task.frame_index
                     task.state = TASK_STATE.FINISHED
                     self.update_table(task)
-
-        else:
-            pass
 
     def update_table(self, task):
         state = "Finished" if task.state == TASK_STATE.FINISHED else ""
@@ -207,7 +188,7 @@ class EdgeWorker:
                     task.frame_cloud = offloading_image
                     self.offloading_executor.submit(self.offload_worker, task)
                 end_time = time.time()
-                task.set_end_time(end_time)
+                task.end_time = end_time
                 task.state = TASK_STATE.FINISHED
                 # upload the result to database
                 self.update_table(task)
@@ -298,43 +279,44 @@ class EdgeWorker:
             else:
                 logger.info(str(res))
 
-    #
+    # collect data for retrain
     def collect_data(self, task, frame ,detection_boxes, detection_class, detection_score):
-        self.select_index = []
-        creat_folder(self.config.retrain.cache_path)
-        cv2.imwrite(os.path.join(self.config.retrain.cache_path,'frames', str(task.frame_index) + '.jpg'), frame)
-        self.avg_scores.append({task.frame_index:np.mean(detection_score)})
-        self.cache_count += 1
-        logger.debug("count {}".format(self.cache_count))
-        for score, label, box in zip(detection_score, detection_class, detection_boxes):
-            self.pred_res.append((task.frame_index, label, box[0], box[1], box[2], box[3], score))
+        if detection_score is not None:
+            creat_folder(self.config.retrain.cache_path)
+            cv2.imwrite(os.path.join(self.config.retrain.cache_path,'frames', str(task.frame_index) + '.jpg'), frame)
+            self.avg_scores.append({task.frame_index: np.mean(detection_score)})
+            self.cache_count += 1
+            logger.debug("count {}".format(self.cache_count))
             if self.cache_count >= self.config.retrain.collect_num:
+                self.retrain_no += 1
                 logger.debug("enough")
                 smallest_elements = sorted(self.avg_scores, key=lambda d: list(d.values())[0])[:self.config.retrain.select_num]
                 self.select_index = [list(d.keys())[0] for d in smallest_elements]
-                print(self.select_index)
-
-                np.savetxt(os.path.join(self.config.retrain.cache_path,'pred_res.txt'), self.pred_res,
-                           fmt=['%d', '%d', '%f', '%f', '%f', '%f', '%f'], delimiter=',')
-
+                logger.debug(self.select_index)
                 self.pred_res = []
-                self.retrain_flag = True
                 self.collect_flag = False
                 self.cache_count = 0
+                if self.retrain_no % self.config.retrain.interval == 0:
+                    self.test_only = True
+                else:
+                    self.test_only = False
+                self.retrain_flag = True
 
 
     # retrain
     def retrain_worker(self):
+        self.annotations = []
         while True:
             if self.retrain_flag:
                 logger.debug("retrain")
-                self.annotations = []
+
                 for index in self.select_index:
                     path = os.path.join(self.config.retrain.cache_path, 'frames', '{}.jpg'.format(index))
+                    logger.debug(path)
                     frame = cv2.imread(path)
-                    logger.debug("get index {}".format(index))
+                    logger.debug("get index {} {}".format(index, time.time()))
                     target_res = get_cloud_target(self.config.server_ip, frame)
-                    logger.debug("get target {}".format(target_res))
+                    logger.debug("get target {} {}".format(target_res, time.time()))
                     for score, label, box in zip(target_res['scores'], target_res['labels'], target_res['boxes']):
                         self.annotations.append((index, label, box[0], box[1], box[2], box[3], score))
                 if len(self.annotations):
@@ -342,11 +324,29 @@ class EdgeWorker:
                                fmt=['%d', '%d', '%f', '%f', '%f', '%f', '%f'], delimiter=',')
 
                 logger.debug("select num {}".format(int(self.config.retrain.select_num*0.8)))
-                self.small_object_detection.retrain(self.config.retrain.cache_path, self.select_index[:int(self.config.retrain.select_num*0.8)])
-                self.small_object_detection.model_evaluation(self.config.retrain.cache_path, self.select_index[int(self.config.retrain.select_num*0.8):])
-                self.collect_flag = True
+                if self.test_only:
+                    logger.debug("test only")
+                    self.small_object_detection.model_evaluation(
+                        self.config.retrain.cache_path, self.select_index)
+                else:
+                    self.small_object_detection.model_evaluation(
+                        self.config.retrain.cache_path, self.select_index[int(self.config.retrain.select_num * 0.8):])
+                    self.small_object_detection.retrain(
+                        self.config.retrain.cache_path, self.select_index[:int(self.config.retrain.select_num*0.8)])
+                    self.small_object_detection.model_evaluation(
+                        self.config.retrain.cache_path, self.select_index[int(self.config.retrain.select_num*0.8):])
                 self.retrain_flag = False
-                clear_folder(self.config.retrain.cache_path)
+                if self.use_history:
+                    self.select_index,self.avg_scores = history_sample(self.select_index,self.avg_scores)
+                    self.annotations = annotion_process(self.annotations, self.select_index)
+                    sample_files(os.path.join(self.config.retrain.cache_path, 'frames') ,self.select_index)
+                    self.cache_count = len(self.select_index)
+                else:
+                    clear_folder(self.config.retrain.cache_path)
+                    self.select_index = []
+                    self.avg_scores = []
+                    self.annotations = []
+                self.collect_flag = True
             time.sleep(1)
 
 

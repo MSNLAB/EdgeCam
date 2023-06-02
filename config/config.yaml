@@ -47,20 +47,21 @@ client:
   #The task from another edge node is offloaded to the cloud after local inference, default 85.
   another_cloud: 90
  #server_ip
- server_ip: '127.0.0.1:50051'
+ server_ip: '43.137.51.180:50051'
  #edge nodes
  edge_id: 1
  destinations: {'id': [2], 'ip':['127.0.0.1:50050']}
  #database config
  database:
-  connection: { 'user': 'root', 'password': 'root', 'host': '127.0.0.1', 'raise_on_warnings': True }
+  connection: { 'user': 'root', 'password': 'root', 'host': '43.137.51.180', 'raise_on_warnings': True }
   database_name: 'mydatabase'
  # retrain
  retrain:
-  num_epoch: 4
+  num_epoch: 2
   cache_path: './cache'
-  collect_num: 20
-  select_num: 20
+  collect_num: 10
+  select_num: 5
+  interval: 2
 
 server:
  server_id: 0

@@ -72,7 +72,7 @@ class Cal_Metrics:
         sum_delay = 0.0
         filtered_out = 0
         i = 0
-
+        last_result = None
         while i < len(result):
             index, start_time, end_time, res, log = result[i]
             gap = end_time-start_time
@@ -84,6 +84,7 @@ class Cal_Metrics:
                 pred = eval(res)
             else:
                 pred = eval(res)
+                last_result = pred
             ground_truth = ground_truths['{}'.format(index)]
             map = calculate_map(ground_truth, pred)
             sum_map += map

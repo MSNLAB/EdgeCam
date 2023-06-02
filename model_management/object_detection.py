@@ -21,6 +21,7 @@ def _collate_fn(batch):
     return tuple(zip(*batch))
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#device = torch.device("cpu")
 logger.debug(device)
 
 class Object_Detection:
@@ -29,6 +30,10 @@ class Object_Detection:
         self.config = config
         self.init_model_flag = False
         self.model_lock = threading.Lock()
+
+        self.record_r = open("record_r.txt", "w")
+        self.record_p = open("record_p.txt", "w")
+
         if type == 'small inference':
             self.model_name = config.small_model_name
             self.init_model_flag = True
@@ -44,13 +49,12 @@ class Object_Detection:
         if self.model_name in model_lib.keys():
             weight_files_path = \
                 os.path.join(weight_folder, model_lib[self.model_name]['model_path'])
-            weight_load = torch.load(weight_files_path)
+            weight_load = torch.load(weight_files_path, map_location=device)
             self.model = eval(self.model_name)(pretrained_backbone=False, pretrained=False)
             self.model.load_state_dict(weight_load)
+            self.model.to(device)
             if self.init_model_flag:
                 self.init_model()
-
-            self.model.to(device)
             self.model.eval()
 
     def init_model(self):
@@ -59,12 +63,13 @@ class Object_Detection:
             param.requires_grad = False
         for param in self.model.roi_heads.parameters():
             param.requires_grad = True
-
+        """
         for module in self.model.roi_heads.modules():
             if isinstance(module, torch.nn.Linear):
                 torch.nn.init.kaiming_normal_(module.weight)
                 if module.bias is not None:
                     torch.nn.init.constant_(module.bias, 0)
+        """
         torch.save(self.model.state_dict(), "./model_management/tmp_model.pth")
 
     def retrain(self, path, select_index):
@@ -72,6 +77,7 @@ class Object_Detection:
         tmp_model = eval(self.model_name)(pretrained_backbone=False, pretrained=False)
         state_dict = torch.load("./model_management/tmp_model.pth", map_location=device)
         tmp_model.load_state_dict(state_dict)
+        tmp_model.to(device)
         for param in self.model.parameters():
             param.requires_grad = False
         for param in self.model.roi_heads.parameters():
@@ -84,7 +90,7 @@ class Object_Detection:
         # 训练设置
         num_epoch = self.config.retrain.num_epoch
         roi_parameters = [p for p in tmp_model.parameters() if p.requires_grad]
-        optimizer = torch.optim.SGD(roi_parameters, lr=0.005, momentum=0.9, weight_decay=0.0005)
+        optimizer = torch.optim.SGD(roi_parameters, lr=0.005, momentum=0.9,weight_decay=0.0005)
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
 
         for epoch in range(num_epoch):
@@ -111,11 +117,16 @@ class Object_Detection:
         frame_path = os.path.join(cache_path, 'frames')
         annotation_path = os.path.join(cache_path, 'annotation.txt')
         annotations_f = pd.read_csv(annotation_path, header=None, names=annotation_cols)
+        test_model = eval(self.model_name)(pretrained_backbone=False, pretrained=False)
+        state_dict = torch.load("./model_management/tmp_model.pth", map_location=device)
+        test_model.load_state_dict(state_dict)
+        test_model.to(device)
+        test_model.eval()
         for _id in select_index:
             logger.debug(_id)
             path = os.path.join(frame_path, str(_id)+'.jpg')
             frame = cv2.imread(path)
-            pred_boxes, pred_class, pred_score = self.get_model_prediction(frame, self.threshold_high)
+            pred_boxes, pred_class, pred_score = self.get_model_prediction(frame, self.threshold_high, test_model)
             pred = {'labels':pred_class, 'boxes': pred_boxes, 'scores':pred_score}
             annos = annotations_f[annotations_f['frame_index'] == _id]
             target_boxes = []
@@ -130,11 +141,53 @@ class Object_Detection:
                     target_boxes.append([x_min, y_min, x_max, y_max])
                     target_labels.append(label)
             target = {'labels':target_labels, 'boxes': target_boxes}
-            cal_map = calculate_map(target, pred, 0.5)
-            logger.debug(cal_map)
-            map.append(cal_map)
-        map = np.mean(map)
-        logger.debug(map)
+            if pred['labels'] is not None:
+                cal_map = calculate_map(target, pred, 0.5)
+                map.append(cal_map)
+        if len(map):
+            map = np.mean(map)
+        else:
+            map = 0.0
+        logger.debug("retrain {}".format(map))
+        self.record_r.write("{}\n".format(map))
+        self.record_r.flush()
+        # pretrained_model
+        map = []
+        state_dict = torch.load("./model_management/pretrained.pth", map_location=device)
+        test_model.load_state_dict(state_dict)
+        test_model.to(device)
+        test_model.eval()
+        logger.debug("pretrained")
+        for _id in select_index:
+            logger.debug(_id)
+            path = os.path.join(frame_path, str(_id)+'.jpg')
+            frame = cv2.imread(path)
+            pred_boxes, pred_class, pred_score = self.get_model_prediction(frame, self.threshold_high, test_model)
+            pred = {'labels':pred_class, 'boxes': pred_boxes, 'scores':pred_score}
+            annos = annotations_f[annotations_f['frame_index'] == _id]
+            target_boxes = []
+            target_labels = []
+            for _idx, _label in annos.iterrows():
+                label = _label['target_id']
+                if label != 0:
+                    x_min = _label['bbox_x1']
+                    y_min = _label['bbox_y1']
+                    x_max = _label['bbox_x2']
+                    y_max = _label['bbox_y2']
+                    target_boxes.append([x_min, y_min, x_max, y_max])
+                    target_labels.append(label)
+            target = {'labels':target_labels, 'boxes': target_boxes}
+            if pred['labels'] is not None:
+                cal_map = calculate_map(target, pred, 0.5)
+                #logger.debug(cal_map)
+                map.append(cal_map)
+        if len(map):
+            map = np.mean(map)
+        else:
+            map = 0.0
+        logger.debug("pre {}".format(map))
+        self.record_p.write("{}\n".format(map))
+        self.record_p.flush()
 
     def small_inference(self, img):
         with self.model_lock:
@@ -168,14 +221,17 @@ class Object_Detection:
         pred_boxes, pred_class, pred_score = self.get_model_prediction(img, self.threshold_high)
         return pred_boxes, pred_class, pred_score
 
-    def get_model_prediction(self, img, threshold):
+    def get_model_prediction(self, img, threshold, model=None):
         #process the image
         img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         transform = transforms.Compose([transforms.ToTensor()])
         img = transform(img)
         img = img.to(device)
         #get the inference result
-        res = self.model([img])
+        if model is None:
+            res = self.model([img])
+        else:
+            res = model([img])
         if torch.cuda.is_available():
             prediction_class = list(res[0]['labels'].cuda().data.cpu().numpy())
             prediction_boxes = [[i[0], i[1], i[2], i[3]] for i in list(res[0]['boxes'].detach().cpu().numpy())]

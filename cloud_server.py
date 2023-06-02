@@ -34,7 +34,7 @@ class CloudServer:
 
         # start the thread for local process
         self.local_queue = Queue(config.local_queue_maxsize)
-        self.local_processor = threading.Thread(target=self.cloud_local, )
+        self.local_processor = threading.Thread(target=self.cloud_local, daemon=True)
         self.local_processor.start()
 
 

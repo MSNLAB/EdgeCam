@@ -5,7 +5,7 @@ import numpy as np
 from sys import getsizeof
 
 
-def cv2_to_base64(frame, qp):
+def cv2_to_base64(frame, qp=90):
     """
     covert image nparray to stream data
     :param frame:

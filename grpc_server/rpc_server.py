@@ -23,12 +23,9 @@ class MessageTransmissionServicer(message_transmission_pb2_grpc.MessageTransmiss
         task.other = True
 
         if request.part_result != "":
-            logger.debug("put1")
             part_result = eval(request.part_result)
             if len(request.part_result['boxes']) != 0:
-                logger.debug("put2")
                 task.add_result(part_result['boxes'], part_result['labels'], part_result['scores'])
-            logger.debug("put3")
 
         if request.note == "edge process":
             task.edge_process = True
@@ -49,13 +46,13 @@ class MessageTransmissionServicer(message_transmission_pb2_grpc.MessageTransmiss
         frame_shape = tuple(int(s) for s in request.frame_shape[1:-1].split(","))
         frame = base64_to_cv2(base64_frame).reshape(frame_shape)
         pred_boxes, pred_class, pred_score = self.object_detection.large_inference(frame)
-        res_dict = {
+        res = {
             'boxes': pred_boxes,
             'labels': pred_class,
             'scores': pred_score
         }
         reply = message_transmission_pb2.FrameReply(
-            response=str(res_dict),
+            response=str(res),
             frame_shape=str(frame_shape),
         )
         return reply
