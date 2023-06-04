@@ -25,18 +25,17 @@ class Encoder(json.JSONEncoder):
 
 class Cal_Metrics:
     def __init__(self, config):
-        self.config = config
-        self.source = config.source
-        self.client_conifg = config.client
+        self.config = config.client
+        self.source = config.client.source
+        self.database_config = config.client.database
         self.inference_config = config.server
-        self.database_config = config.database
         self.large_object_detection = Object_Detection(self.inference_config, type='large inference')
 
     def cal_ground_truth(self):
         with VideoProcessor(self.source) as video:
             truth_dict = {}
             video_fps = video.fps
-            interval = self.client_conifg.interval
+            interval = self.config.interval
             logger.info("the video fps is {}".format(video_fps))
             if interval == 0:
                 logger.error("the interval error")
@@ -60,33 +59,38 @@ class Cal_Metrics:
 
 
     def cal_mAP(self):
-        interval = self.client_conifg.interval
+        interval = self.config.interval
         with open('truth.json', 'r') as f:
             ground_truths = json.load(f)
         # calculates the mAP for an IOU threshold of 0.5
         database = DataBase(self.database_config)
         database.use_database()
-        result = database.select_result(self.client_conifg.edge_id)
-        total_frame = self.config.max_count / interval
+        result = database.select_result(self.config.edge_id)
+        total_frame = self.source.max_count / interval
         sum_map = 0.0
         sum_delay = 0.0
         filtered_out = 0
         i = 0
         last_result = None
+        logger.debug(len(result))
         while i < len(result):
             index, start_time, end_time, res, log = result[i]
             gap = end_time-start_time
             sum_delay += gap
             result_dict = eval(res)
-            if 'ref' in result_dict.keys:
-                filtered_out += 1
-                res = result[result_dict['ref']][3]
-                pred = eval(res)
-            else:
+            logger.debug(result_dict.keys())
+            if 'lables' in result_dict.keys():
                 pred = eval(res)
                 last_result = pred
+            elif 'ref' in result_dict.keys():
+                filtered_out += 1
+                pred = last_result
+            else:
+                pred = last_result
+            logger.debug(pred)
             ground_truth = ground_truths['{}'.format(index)]
-            map = calculate_map(ground_truth, pred)
+            logger.debug(ground_truth)
+            map = calculate_map(ground_truth, pred, 0.5)
             sum_map += map
 
 
@@ -99,14 +103,11 @@ if __name__ == '__main__':
         config = yaml.load(f, Loader=yaml.SafeLoader)
     # provide class-like access for dict
     config = munch.munchify(config)
-    cal_truth = True
+    cal_truth = False
     cal = Cal_Metrics(config)
-    #cal.cal_ground_truth()
-    cal.cal_detection_result()
-    """
     if cal_truth:
         cal.cal_ground_truth()
     cal.cal_mAP()
-    """
+
 
 

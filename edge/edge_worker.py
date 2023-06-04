@@ -17,7 +17,7 @@ from difference.diff import DiffProcessor
 from edge.info import TASK_STATE
 from edge.resample import history_sample, annotion_process
 from edge.task import Task
-from edge.transmit import get_cloud_target
+from edge.transmit import get_cloud_target, is_network_connected
 from grpc_server import message_transmission_pb2_grpc, message_transmission_pb2
 from grpc_server.rpc_server import MessageTransmissionServicer
 
@@ -47,6 +47,7 @@ class EdgeWorker:
         self.database.clear_table(self.edge_id)
         self.data_lock = threading.Lock()
 
+        self.queue_info = {'{}'.format(i + 1): 0 for i in range(self.config.edge_num)}
         self.frame_cache = Queue(config.frame_cache_maxsize)
         self.local_queue = Queue(config.local_queue_maxsize)
 
@@ -62,16 +63,16 @@ class EdgeWorker:
         self.diff_processor.start()
 
         # start the thread for edge server
-        #self.edge_server = threading.Thread(target=self.start_edge_server, daemon=True)
-        #self.edge_server.start()
+        self.edge_server = threading.Thread(target=self.start_edge_server, daemon=True)
+        self.edge_server.start()
 
         # start the thread for local process
         self.local_processor = threading.Thread(target=self.local_worker,daemon=True)
         self.local_processor.start()
 
         # start the thread for retrain process
+        self.collect_flag = self.config.retrain.flag
         self.retrain_flag = False
-        self.collect_flag = True
         self.cache_count = 0
 
         self.use_history = True
@@ -136,13 +137,18 @@ class EdgeWorker:
                     self.update_table(task)
 
     def update_table(self, task):
-        state = "Finished" if task.state == TASK_STATE.FINISHED else ""
+        if task.state == TASK_STATE.FINISHED:
+            state = "Finished"
+        elif task.state == TASK_STATE.TIMEOUT:
+            state = "Timeout"
+        else:
+            state = ""
         if task.ref is not None:
             result = {'ref': task.ref}
         else:
             detection_boxes, detection_class, detection_score = task.get_result()
             result = {
-                'lables': detection_class,
+                'labels': detection_class,
                 'boxes': detection_boxes,
                 'scores': detection_score
             }
@@ -153,13 +159,20 @@ class EdgeWorker:
             state,
             task.frame_index)
         with self.data_lock:
-            self.database.update_data(self.edge_id, data)
+            self.database.update_data(task.edge_id, data)
 
 
     def local_worker(self):
         while True:
             # get a inference task from local queue
             task = self.local_queue.get(block=True)
+            if time.time() - task.start_time >= self.config.wait_thresh:
+                end_time = time.time()
+                task.end_time = end_time
+                task.state = TASK_STATE.TIMEOUT
+                self.update_table(task)
+                continue
+            self.queue_info['{}'.format(self.edge_id)] = self.local_queue.qsize()
             current_frame = task.frame_edge
             # get the query image and the small inference result
             offloading_image, detection_boxes, detection_class, detection_score \
@@ -199,15 +212,13 @@ class EdgeWorker:
         qp = self.config.quality
         # offload to cloud
         if destination_edge_id is None:
-
             frame_cloud = task.frame_cloud
             assert frame_cloud is not None
             detection_boxes, detection_class, detection_score = task.get_result()
             if len(detection_boxes) != 0:
-                part_result = {'boxes': detection_boxes, 'lables': detection_class, 'scores': detection_score}
+                part_result = {'boxes': detection_boxes, 'labels': detection_class, 'scores': detection_score}
             else:
                 part_result = ""
-            logger.debug("part_result {}".format(part_result))
             # offload to the cloud directly
             if task.directly_cloud:
                 new_frame = frame_resize(frame_cloud, new_height=new_height.directly_cloud)
@@ -249,13 +260,15 @@ class EdgeWorker:
                     task.end_time = end_time
                     self.update_table(task)
             else:
-                logger.info(str(res))
+                self.queue_info['{}'.format(self.edge_id)] = self.local_queue.qsize()
+
         # to another edge
         else:
             frame_edge = task.frame_edge
             new_frame = frame_resize(frame_edge, new_height=new_height.another)
             encoded_image = cv2_to_base64(new_frame, qp=qp.another)
-
+            if task.edge_process is True:
+                note = "edge process"
             msg_request = message_transmission_pb2.MessageRequest(
                 source_edge_id=int(self.edge_id),
                 frame_index=int(task.frame_index),
@@ -264,9 +277,8 @@ class EdgeWorker:
                 part_result="",
                 raw_shape=str(task.raw_shape),
                 new_shape=str(new_frame.shape),
-                note="edge process",
+                note=note,
             )
-
             destinations = self.config.destinations
             destination_edge_ip = destinations['ip'][destinations['id'] == destination_edge_id]
             try:
@@ -277,7 +289,9 @@ class EdgeWorker:
                 logger.exception("the edge id{}, ip {} can not reply, {}".format(destination_edge_id,destination_edge_ip,e))
                 self.local_queue.put(task, block=True)
             else:
-                logger.info(str(res))
+                logger.debug("forward to other edge")
+                self.queue_info['{}'.format(self.edge_id)] = self.local_queue.qsize()
+                self.queue_info['{}'.format(res.destination_edge_id)] = res.local_length
 
     # collect data for retrain
     def collect_data(self, task, frame ,detection_boxes, detection_class, detection_score):
@@ -286,13 +300,11 @@ class EdgeWorker:
             cv2.imwrite(os.path.join(self.config.retrain.cache_path,'frames', str(task.frame_index) + '.jpg'), frame)
             self.avg_scores.append({task.frame_index: np.mean(detection_score)})
             self.cache_count += 1
-            logger.debug("count {}".format(self.cache_count))
             if self.cache_count >= self.config.retrain.collect_num:
                 self.retrain_no += 1
-                logger.debug("enough")
                 smallest_elements = sorted(self.avg_scores, key=lambda d: list(d.values())[0])[:self.config.retrain.select_num]
                 self.select_index = [list(d.keys())[0] for d in smallest_elements]
-                logger.debug(self.select_index)
+                logger.debug("the select index {}".format(self.select_index))
                 self.pred_res = []
                 self.collect_flag = False
                 self.cache_count = 0
@@ -309,21 +321,17 @@ class EdgeWorker:
         while True:
             if self.retrain_flag:
                 logger.debug("retrain")
-
                 for index in self.select_index:
                     path = os.path.join(self.config.retrain.cache_path, 'frames', '{}.jpg'.format(index))
                     logger.debug(path)
                     frame = cv2.imread(path)
-                    logger.debug("get index {} {}".format(index, time.time()))
                     target_res = get_cloud_target(self.config.server_ip, frame)
-                    logger.debug("get target {} {}".format(target_res, time.time()))
                     for score, label, box in zip(target_res['scores'], target_res['labels'], target_res['boxes']):
                         self.annotations.append((index, label, box[0], box[1], box[2], box[3], score))
                 if len(self.annotations):
                     np.savetxt(os.path.join(self.config.retrain.cache_path,'annotation.txt'), self.annotations,
                                fmt=['%d', '%d', '%f', '%f', '%f', '%f', '%f'], delimiter=',')
 
-                logger.debug("select num {}".format(int(self.config.retrain.select_num*0.8)))
                 if self.test_only:
                     logger.debug("test only")
                     self.small_object_detection.model_evaluation(
@@ -379,6 +387,38 @@ class EdgeWorker:
                 task.frame_cloud = task.frame_edge
                 task.directly_cloud = True
                 self.offloading_executor.submit(self.offload_worker, task)
+
+        elif policy == 'Edge-Shortest':
+            shortest_id = min(self.queue_info, key=self.queue_info.get)
+            task.edge_process = True
+            if int(shortest_id) == self.edge_id or \
+                    self.queue_info['{}'.format(shortest_id)] == self.queue_info['{}'.format(self.edge_id)]:
+                self.local_queue.put(task, block=True)
+            else:
+                destinations = self.config.destinations
+                destination_edge_ip = destinations['ip'][destinations['id'] == shortest_id]
+                if is_network_connected(destination_edge_ip):
+                    self.offloading_executor.submit(self.offload_worker, task, int(shortest_id))
+                else:
+                    logger.info("could not connect to {}".format(destination_edge_ip))
+                    self.local_queue.put(task, block=True)
+
+        elif policy == 'Shortest-Queue-Threshold':
+            queue_thresh = self.config.queue_thresh
+            shortest_info = min(zip(self.queue_info.values(), self.queue_info.keys()))
+            shortest_length = shortest_info[0]
+            shortest_id = shortest_info[1]
+            if shortest_length > queue_thresh:
+                task.frame_cloud = task.frame_edge
+                task.directly_cloud = True
+                self.offloading_executor.submit(self.offload_worker, task)
+            elif int(shortest_id) == self.edge_id:
+                task.edge_process = True
+                self.local_queue.put(task, block=True)
+            else:
+                task.edge_process = True
+                self.offloading_executor.submit(self.offload_worker, task, int(shortest_id))
+
         else:
             logger.error('the policy does not exist.')
 

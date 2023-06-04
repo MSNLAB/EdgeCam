@@ -23,3 +23,16 @@ def get_cloud_target(server_ip, frame):
     else:
         logger.info(str(res))
     return result_dict
+
+
+
+import socket
+
+def is_network_connected(address):
+    ip, port = address.split(':')[0], int(address.split(':')[1])
+    try:
+        socket.create_connection((ip, port), timeout=1)
+        return True
+    except OSError:
+        return False
+

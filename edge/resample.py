@@ -1,7 +1,7 @@
 import random
 
 def history_sample(index_list, score_list):
-    num_elements = min(len(index_list), len(score_list)) // 2
+    num_elements = min(len(index_list), len(score_list)) // 4
     index_list_c = random.sample(index_list, num_elements)
     score_list_c = []
     for item in score_list:

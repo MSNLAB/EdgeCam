@@ -13,7 +13,7 @@ class VideoProcessor:
     def __enter__(self):
         if self.video_path and self.rtsp.flag is False:
             self.cap = cv2.VideoCapture(self.video_path)
-            #self.cap.set(cv2.CAP_PROP_POS_FRAMES, 3000)
+            #self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             if not self.cap:
                 logger.error("can not open the video")
             self.frame_count = self.cap.get(int(cv2.CAP_PROP_FRAME_COUNT))

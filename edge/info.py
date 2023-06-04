@@ -7,6 +7,7 @@ class FRAME_TYPE(Enum):
 
 class TASK_STATE(Enum):
     FINISHED = 1
+    TIMEOUT = 2
 
 class ACTION(Enum):
     pass

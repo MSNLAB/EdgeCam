@@ -2,61 +2,65 @@ client:
  # the source video
  source:
   video_path: ./video_data/dayroad.mp4
-  max_count: 120
+  max_count: 5
   rtsp:
    flag: False
    account: your account
    password: your password
    ip_address: you camera ip
    channel: 1
- #the frame interval
+ # the frame interval
  interval: 2
- #the difference feature (pixel, edge, area, corner).
+ # the difference feature (pixel, edge, area, corner).
  feature: edge
- #the difference flag and thresh
+ # the difference flag and thresh
  diff_flag: True
  diff_thresh: 0.01
- #the queue maxsize
+ # the queue maxsize
  local_queue_maxsize: 10
- #the queue threshold for offloading
+ # the queue threshold for offloading
  queue_thresh: 5
- #Number of worker threads to offloading thread pool
+ # the max wait time
+ wait_thresh: 10
+ # Number of worker threads to offloading thread pool
  offloading_max_worker: 1
  frame_cache_maxsize: 100
  small_model_name: fasterrcnn_mobilenet_v3_large_fpn
- #select the offloading policy
- policy: Edge-Local
- #change frame resolution using frame new height
+ # select the offloading policy
+ policy: Edge-Shortest
+ # change frame resolution using frame new height
  new_height:
-  #offload to another edge node [1080, 720], default 720
+  # offload to another edge node [1080, 720], default 720
   another: 720
-  #option to offload directly to the cloud [1080, 720, 480], default 480
+  # option to offload directly to the cloud [1080, 720, 480], default 480
   directly_cloud: 720
-  #offload to the cloud after local inference [1080, 720, 480], default 720
+  # offload to the cloud after local inference [1080, 720, 480], default 720
   local_cloud: 720
-  #The task from another edge node is offloaded to the cloud after local inference [720, 480], default 720
+  # The task from another edge node is offloaded to the cloud after local inference [720, 480], default 720
   another_cloud: 720
- #the quality of the transmitted frame
+ # the quality of the transmitted frame
  quality:
-  #offload to another edge node [90, 85], default 85
+  # offload to another edge node [90, 85], default 85
   another: 90
-  #Option to offload directly to the cloud [85, 95], default 85
+  # Option to offload directly to the cloud [85, 95], default 85
   directly_cloud: 90
-  #offload to the cloud after local inference [85, 95], default 95
+  # offload to the cloud after local inference [85, 95], default 95
   local_cloud: 90
-  #The task from another edge node is offloaded to the cloud after local inference, default 85.
+  # The task from another edge node is offloaded to the cloud after local inference, default 85.
   another_cloud: 90
- #server_ip
- server_ip: '43.137.51.180:50051'
- #edge nodes
+ # server_ip
+ server_ip: '127.0.0.1:50051'
+ # edge nodes
  edge_id: 1
- destinations: {'id': [2], 'ip':['127.0.0.1:50050']}
- #database config
+ edge_num: 2
+ destinations: {'id': [2], 'ip':['192.168.0.185:50050']}
+ # database config
  database:
-  connection: { 'user': 'root', 'password': 'root', 'host': '43.137.51.180', 'raise_on_warnings': True }
+  connection: { 'user': 'root', 'password': 'root', 'host': '127.0.0.1', 'raise_on_warnings': True }
   database_name: 'mydatabase'
  # retrain
  retrain:
+  flag: False
   num_epoch: 2
   cache_path: './cache'
   collect_num: 10
@@ -65,11 +69,12 @@ client:
 
 server:
  server_id: 0
- edge_ids: [1]
+ edge_ids: [1,2]
  large_model_name: fasterrcnn_resnet50_fpn
  #the queue maxsize
  local_queue_maxsize: 10
- data_queue_maxsize: 10
+ # the max wait time
+ wait_thresh: 10
  #database config
  database:
   connection: { 'user': 'root', 'password': 'root', 'host': '127.0.0.1', 'raise_on_warnings': True }

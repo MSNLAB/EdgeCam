@@ -41,6 +41,12 @@ class CloudServer:
     def cloud_local(self):
         while True:
             task = self.local_queue.get(block=True)
+            if time.time() - task.start_time >= self.config.wait_thresh:
+                end_time = time.time()
+                task.end_time = end_time
+                task.state = TASK_STATE.TIMEOUT
+                self.update_table(task)
+                continue
             task.frame_cloud = task.frame_edge
             frame = task.frame_cloud
             high_boxes, high_class, high_score = self.large_object_detection.large_inference(frame)
@@ -57,10 +63,15 @@ class CloudServer:
 
 
     def update_table(self, task):
+        if task.state == TASK_STATE.FINISHED:
+            state = "Finished"
+        elif task.state == TASK_STATE.TIMEOUT:
+            state = "Timeout"
+        else:
+            state = ""
         detection_boxes, detection_class, detection_score = task.get_result()
-        state = "Finished" if task.state == TASK_STATE.FINISHED else ""
         result = {
-            'lables': detection_class,
+            'labels': detection_class,
             'boxes': detection_boxes,
             'scores': detection_score
         }
