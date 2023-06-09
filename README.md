@@ -1,9 +1,9 @@
-# EdgeVision
+# EdgeCam
 
-**EdgeVision is an edge-edge and edge-cloud collaborative framework for content-aware video analytics.**
+**EdgeCam is an edge-edge and edge-cloud collaborative framework for content-aware video analytics.**
 
 ## Overview
-EdgeVision consists of multiple edge nodes and a cloud server that work collaboratively to handle inference requests.
+EdgeCam consists of multiple edge nodes and a cloud server that work collaboratively to handle inference requests.
 
 - **Edge node:** 
 Edge nodes in different geographical locations read video frames through network cameras and perform inference through the small DNN model. 
@@ -19,7 +19,7 @@ The cloud can either perform inference for the whole video frame or the regions 
 </div>
 
 ## Workflow
-EdgeVision supports three video analytics pipelines to process a video frame.
+EdgeCam supports three video analytics pipelines to process a video frame.
 1. The video frame is first put into the local queue of the edge node and inferred with the local small DNN model. 
 The edge node selects the regions of the video frame that have low recognition confidence from the recognition results, and encodes these parts of the image in specified quality and offloads them to the cloud for inference with the large DNN models.
 2. The video frame can be directly dispatched to another edge node with a lighter workload for inference.
@@ -117,7 +117,7 @@ For example:
 
 **Step 2:** Start the cloud server.
 ```bash
-cd ~/EdgeVision
+cd ~/EdgeCam
 python3 cloud_server.py
 ```
 
@@ -125,7 +125,7 @@ python3 cloud_server.py
 
 Please use the following command for each edge node.
 ```bash
-cd ~/EdgeVision
+cd ~/EdgeCam
 python3 edge_client.py
 ```
 
