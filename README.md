@@ -13,12 +13,14 @@ Then, our system have a decision engine to intelligently select offloading strat
 </div>
 
 ## Workflow
-EdgeCam supports three video analytics pipelines to process a video frame.
-1. The video frame is first put into the local queue of the edge node and inferred with the local small DNN model. 
-The edge node selects the regions of the video frame that have low recognition confidence from the recognition results, and encodes these parts of the image in specified quality and offloads them to the cloud for inference with the large DNN models.
-2. The video frame can be directly dispatched to another edge node with a lighter workload for inference.
-When another edge node receives the video frame, it can be processed through Case 1 of the video analytics pipelines.
-3. The video frame can also be directly offloaded to the cloud for inference.
+1) On-edge pipeline (Standalone). The video frames can be processed on the edge side. Specifically, the video frames are pushed into the edge local queue, and then the on-edge deployed models will extract their information (e.g., bounding boxes, categories) from local queue sequentially. Additionally, since the on-edge deployed models are always compressed to fit the limited edge resources, there are many regions in video frames may not be recognized accurately, and thus these uncertained regions can also be encoded and offload into the cloud server for golden model inference.
+
+2) Edge-to-edge pipeline. Alternatively, the video frame can be directly dispatched to another edge node that currently has a lighter workload for inference.
+In such cases, the edge node has the capability to dynamically adjust the resolution and encoding quality of the video frame, effectively reducing the bandwidth cost associated with the dispatch. Upon receiving the video frame, the designated edge node can then proceed with processing it using Case 1 of the video analytics pipelines.
+
+3) Edge-to-cloud pipeline. Furthermore, the video frame can be directly offloaded to the cloud for inference, bypassing the intermediate edge nodes. The edge node has the capability to adjust the resolution and encoding quality of the video frame to minimize bandwidth costs during the offloading process.
+
+EdgeCam implements continuous learning to enhance the accuracy of lightweight models on edge nodes, enabling them to handle data drift. The edge nodes periodically identify video frames that exhibit lower average confidence in the predicted results. These selected frames are then transmitted to the cloud to obtain the corresponding ground truth information. The deployed model is retrained using these frames to improve inference accuracy.
 
 ## Install
 **1. System Requirements**
