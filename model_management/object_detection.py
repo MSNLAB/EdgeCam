@@ -107,10 +107,13 @@ class Object_Detection:
             # Update the learning rate
             lr_scheduler.step()
         torch.save(tmp_model.state_dict(), "./model_management/tmp_model.pth")
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         state_dict = torch.load("./model_management/tmp_model.pth", map_location=device)
         with self.model_lock:
             self.model.load_state_dict(state_dict)
-        self.model.eval()
+            self.model.eval()
 
     def model_evaluation(self,cache_path, select_index):
         map = []
@@ -222,6 +225,8 @@ class Object_Detection:
         return pred_boxes, pred_class, pred_score
 
     def get_model_prediction(self, img, threshold, model=None):
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         #process the image
         img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         transform = transforms.Compose([transforms.ToTensor()])

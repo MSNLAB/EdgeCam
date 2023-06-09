@@ -2,7 +2,7 @@ client:
  # the source video
  source:
   video_path: ./video_data/dayroad.mp4
-  max_count: 5
+  max_count: 1000
   rtsp:
    flag: False
    account: your account
@@ -21,13 +21,13 @@ client:
  # the queue threshold for offloading
  queue_thresh: 5
  # the max wait time
- wait_thresh: 10
+ wait_thresh: 100
  # Number of worker threads to offloading thread pool
  offloading_max_worker: 1
  frame_cache_maxsize: 100
  small_model_name: fasterrcnn_mobilenet_v3_large_fpn
  # select the offloading policy
- policy: Edge-Shortest
+ policy: Edge-Local
  # change frame resolution using frame new height
  new_height:
   # offload to another edge node [1080, 720], default 720
@@ -52,24 +52,24 @@ client:
  server_ip: '127.0.0.1:50051'
  # edge nodes
  edge_id: 1
- edge_num: 2
- destinations: {'id': [2], 'ip':['192.168.0.185:50050']}
+ edge_num: 1
+ destinations: {'id': [], 'ip':[]}
  # database config
  database:
   connection: { 'user': 'root', 'password': 'root', 'host': '127.0.0.1', 'raise_on_warnings': True }
   database_name: 'mydatabase'
  # retrain
  retrain:
-  flag: False
+  flag: True
   num_epoch: 2
   cache_path: './cache'
-  collect_num: 10
-  select_num: 5
-  interval: 2
+  collect_num: 20
+  select_num: 15
+  window: 90
 
 server:
  server_id: 0
- edge_ids: [1,2]
+ edge_ids: [1]
  large_model_name: fasterrcnn_resnet50_fpn
  #the queue maxsize
  local_queue_maxsize: 10

@@ -63,8 +63,8 @@ class EdgeWorker:
         self.diff_processor.start()
 
         # start the thread for edge server
-        self.edge_server = threading.Thread(target=self.start_edge_server, daemon=True)
-        self.edge_server.start()
+        #self.edge_server = threading.Thread(target=self.start_edge_server, daemon=True)
+        #self.edge_server.start()
 
         # start the thread for local process
         self.local_processor = threading.Thread(target=self.local_worker,daemon=True)
@@ -72,11 +72,12 @@ class EdgeWorker:
 
         # start the thread for retrain process
         self.collect_flag = self.config.retrain.flag
+        self.collect_time = None
+        self.collect_time_flag = True
         self.retrain_flag = False
         self.cache_count = 0
 
         self.use_history = True
-        self.test_only = False
         self.retrain_no = 0
 
         self.retrain_processor = threading.Thread(target=self.retrain_worker,daemon=True)
@@ -180,7 +181,12 @@ class EdgeWorker:
 
             # collect data for retrain
             if self.collect_flag:
-                self.collect_data(task, current_frame ,detection_boxes, detection_class, detection_score)
+                if self.collect_time_flag:
+                    self.collect_time = time.time()
+                    self.collect_time_flag = False
+                duration = time.time() - self.collect_time
+                if duration > self.config.retrain.window:
+                    self.collect_data(task, current_frame ,detection_boxes, detection_class, detection_score)
 
             if detection_boxes is not None:
                 task.add_result(detection_boxes, detection_class, detection_score)
@@ -308,10 +314,6 @@ class EdgeWorker:
                 self.pred_res = []
                 self.collect_flag = False
                 self.cache_count = 0
-                if self.retrain_no % self.config.retrain.interval == 0:
-                    self.test_only = True
-                else:
-                    self.test_only = False
                 self.retrain_flag = True
 
 
@@ -332,17 +334,10 @@ class EdgeWorker:
                     np.savetxt(os.path.join(self.config.retrain.cache_path,'annotation.txt'), self.annotations,
                                fmt=['%d', '%d', '%f', '%f', '%f', '%f', '%f'], delimiter=',')
 
-                if self.test_only:
-                    logger.debug("test only")
-                    self.small_object_detection.model_evaluation(
-                        self.config.retrain.cache_path, self.select_index)
-                else:
-                    self.small_object_detection.model_evaluation(
-                        self.config.retrain.cache_path, self.select_index[int(self.config.retrain.select_num * 0.8):])
-                    self.small_object_detection.retrain(
-                        self.config.retrain.cache_path, self.select_index[:int(self.config.retrain.select_num*0.8)])
-                    self.small_object_detection.model_evaluation(
-                        self.config.retrain.cache_path, self.select_index[int(self.config.retrain.select_num*0.8):])
+                self.small_object_detection.model_evaluation(
+                    self.config.retrain.cache_path, self.select_index)
+                self.small_object_detection.retrain(
+                    self.config.retrain.cache_path, self.select_index[:int(self.config.retrain.select_num*0.8)])
                 self.retrain_flag = False
                 if self.use_history:
                     self.select_index,self.avg_scores = history_sample(self.select_index,self.avg_scores)
@@ -354,8 +349,10 @@ class EdgeWorker:
                     self.select_index = []
                     self.avg_scores = []
                     self.annotations = []
+                self.collect_time_flag = True
                 self.collect_flag = True
-            time.sleep(1)
+            time.sleep(0.2)
+
 
 
     def start_edge_server(self):
