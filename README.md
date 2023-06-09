@@ -3,16 +3,10 @@
 **EdgeCam is an edge-edge and edge-cloud collaborative framework for content-aware video analytics.**
 
 ## Overview
-EdgeCam consists of multiple edge nodes and a cloud server that work collaboratively to handle inference requests.
-
-- **Edge node:** 
-Edge nodes in different geographical locations read video frames through network cameras and perform inference through the small DNN model. 
-The functions of the edge node include reading the video frame, calculating difference, local inference, offloading, video frame pre-processing, and information updater.
-- **Cloud:**
-The cloud server is deployed with large DNN models with more significant computational complexity and higher recognition accuracy. 
-The cloud server listens to the inference requests from the edge nodes. 
-After receiving an inference request, the cloud server puts the task into the inference queue. 
-The cloud can either perform inference for the whole video frame or the regions that need further analytics with more precise models.
+our system architecture, EdgeCam, consists of multiple edge nodes and one cloud server to efficiently handle video inference requests.
+The main procedures and core modules are present as follows. 
+Firstly, for the video collected from on-edge camera, our system support a filter engine that can determine whether a video frame needs to be filtered or not, so as to save the downstream resource costs.
+Then, our system have a decision engine to intelligently select offloading strategies for video frames, while adjusting their resolutions and encoding qualities adaptively.
 
 <div align="center">
 <img src="./docs/structure4.png" width="50%" height="50%">
