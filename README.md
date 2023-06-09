@@ -15,7 +15,7 @@ After receiving an inference request, the cloud server puts the task into the in
 The cloud can either perform inference for the whole video frame or the regions that need further analytics with more precise models.
 
 <div align="center">
-<img src="./docs/structure (2).pdf" width="50%" height="50%">
+<img src="./docs/structure4.png" width="50%" height="50%">
 </div>
 
 ## Workflow
