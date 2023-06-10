@@ -35,10 +35,10 @@ class Object_Detection:
         self.record_p = open("record_p.txt", "w")
 
         if type == 'small inference':
-            self.model_name = config.small_model_name
+            self.model_name = config.lightweight
             self.init_model_flag = True
         else:
-            self.model_name = config.large_model_name
+            self.model_name = config.golden
         self.model = None
         self.load_model()
         self.threshold_low = 0.2
