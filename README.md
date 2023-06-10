@@ -4,7 +4,7 @@
 ## Overview
 
 <div align="center">
-<img src="./docs/structure4.png" width="50%" height="50%">
+<img src="./docs/structure.png" width="50%" height="50%">
 </div>
 
 EdgeCam, an open-source distributed camera system that incorporates inference scheduling and continuous learning for video analytics. 
