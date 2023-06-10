@@ -98,6 +98,10 @@ lightweight: fasterrcnn_mobilenet_v3_large_fpn
 golden: fasterrcnn_resnet50_fpn
 ```
 
+**Retraining configuration**
+
+The users can configure whether to collect frames for model retraining, the window size of retraining, the number of collected frames, the number of training epochs, etc.
+
 **Database**
 
 To be able to connect to the database, please configure user name, password, and ip address of the database.
