@@ -1,41 +1,30 @@
-# EdgeCam
+# EdgeCam: A Distributed Camera System for Inference Scheduling and Continuous Learning in Video Analytics
 
-**EdgeCam is an edge-edge and edge-cloud collaborative framework for content-aware video analytics.**
 
 ## Overview
-our system architecture, EdgeCam, consists of multiple edge nodes and one cloud server to efficiently handle video inference requests.
-The main procedures and core modules are present as follows. 
-Firstly, for the video collected from on-edge camera, our system support a filter engine that can determine whether a video frame needs to be filtered or not, so as to save the downstream resource costs.
-Then, our system have a decision engine to intelligently select offloading strategies for video frames, while adjusting their resolutions and encoding qualities adaptively.
 
 <div align="center">
 <img src="./docs/structure4.png" width="50%" height="50%">
 </div>
 
-## Workflow
-1) On-edge pipeline (Standalone). The video frames can be processed on the edge side. Specifically, the video frames are pushed into the edge local queue, and then the on-edge deployed models will extract their information (e.g., bounding boxes, categories) from local queue sequentially. Additionally, since the on-edge deployed models are always compressed to fit the limited edge resources, there are many regions in video frames may not be recognized accurately, and thus these uncertained regions can also be encoded and offload into the cloud server for golden model inference.
+EdgeCam, an open-source distributed camera system that incorporates inference scheduling and continuous learning for video analytics. 
+The system comprises multiple edge nodes and the cloud, enabling collaborative video analytics. 
+The edge node also gathers drift data to support continuous learning and maintain recognition accuracy.
 
-2) Edge-to-edge pipeline. Alternatively, the video frame can be directly dispatched to another edge node that currently has a lighter workload for inference.
-In such cases, the edge node has the capability to dynamically adjust the resolution and encoding quality of the video frame, effectively reducing the bandwidth cost associated with the dispatch. Upon receiving the video frame, the designated edge node can then proceed with processing it using Case 1 of the video analytics pipelines.
 
-3) Edge-to-cloud pipeline. Furthermore, the video frame can be directly offloaded to the cloud for inference, bypassing the intermediate edge nodes. The edge node has the capability to adjust the resolution and encoding quality of the video frame to minimize bandwidth costs during the offloading process.
+Firstly, for the video collected from on-edge camera, our system support a filter engine that can determine whether a video frame needs to be filtered or not, so as to save the downstream resource costs.
+Then, our system have a decision engine to intelligently select offloading strategies for video frames, while adjusting their resolutions and encoding qualities adaptively.
+Moreover, EdgeCam implements continuous learning to enhance the accuracy of lightweight models on edge nodes, enabling them to handle data drift.
 
-EdgeCam implements continuous learning to enhance the accuracy of lightweight models on edge nodes, enabling them to handle data drift. The edge nodes periodically identify video frames that exhibit lower average confidence in the predicted results. These selected frames are then transmitted to the cloud to obtain the corresponding ground truth information. The deployed model is retrained using these frames to improve inference accuracy.
+
 
 ## Install
-**1. System Requirements**
 
-* [ubuntu 18.04](http://releases.ubuntu.com/18.04/)
-* [Python 3.6.9](https://www.python.org/downloads/release/python-369/)
-* [Jetpack 4.5](https://developer.nvidia.com/jetpack-sdk-45-archive)
-* [cuda 10.2](https://developer.nvidia.com/cuda-toolkit)
-* [pytorch 1.9.0](https://pytorch.org/)
-
-**2. Edge Node** 
+**On edge** 
 
 Please install the following libraries on each edge node.
-* Install the corresponding version of [torch](https://forums.developer.nvidia.com/t/pytorch-for-jetson/72048), [torchvision](https://forums.developer.nvidia.com/t/pytorch-for-jetson/72048), and opencv-python.
-* Install the following libraries.
+1. Install the deep learning framework pytorch and opencv-python on the [Jetson](https://forums.developer.nvidia.com/t/pytorch-for-jetson/72048).
+2. Install dependent libraries.
 ```bash
 pip3 install munch
 pip3 install grpcio
@@ -45,24 +34,25 @@ pip3 install mysql-connector-python
 pip3 install mapcalc
 pip3 install APScheduler
 pip3 install imutils
+pip3 install PyYAML
 ```
+**On cloud**
 
-**3. Cloud**
+Similar to the installation on the edge node, install the corresponding version of Pytorch and required libraries.
 
-Similar to the installation on the edge node, install the corresponding version of [torch](https://pytorch.org/get-started/previous-versions/), [torchvision](https://pytorch.org/get-started/previous-versions/) and required libraries.
+**Database**
 
-**4. Database**
-
-Please install and configure the MySQL database.
+1. Installthe MySQL database.
 ```bash
 sudo apt install mysql-server
 ```
+2. The MySQL database is configured to allow remote connections.
+
 ## Usage
 
-To be able to start the service for video analytics, please configure it step by step.
+#### 1. Modify the configuration file (config/config.yaml) as needed.
 
-**Step 1:** Modify the configuration file (config/config.yaml) as needed.
-1. Video Source
+**Video Source**
 
 If the video source is a video file, please configure the path of the video file.
 ```
@@ -78,7 +68,15 @@ rtsp:
  ip_address: your camera ip
  channel: 1
 ```
-2. IP configuration
+
+**Feature Type**
+
+One can choose different features to calculate video frame difference, including pixel, edge, area, and corner features.
+```
+feature: edge
+```
+
+**IP configuration**
 
 Please configure the IP address of the cloud server.
 ```
@@ -89,17 +87,24 @@ Please configure the number and IP addresses of edge nodes.
 ```
 edge_id: the edge node ID
 edge_num: the number of edge nodes
-edges: ['edge ip 1:50051', 'edge ip 2:50051', ...]
+destinations: {'id': [1, 2, ...], 'ip':[ip1, ip2, ...]}
 ```
 
-3. Database
+**Deployed Model** 
+The models deployed on the edge node and the cloud can be configured by specifying model names. The pre-trained model directory is model_management/models.
+```
+lightweight: fasterrcnn_mobilenet_v3_large_fpn 
+golden: fasterrcnn_resnet50_fpn
+```
+
+**Database**
 
 To be able to connect to the database, please configure user name, password, and ip address of the database.
 ```
 connection: {'user': 'your name', 'password': 'your password', 'host': 'database ip', 'raise_on_warnings': True}
 ```
 
-4. Offloading policy
+**Offloading policy**
 
 Please configure offloading policy. 
 ```
@@ -108,9 +113,13 @@ policy: Edge-Cloud-Assited
 
 For example:
 
-- Edge-Cloud-Assisted: The inference for a video frame will be first conducted with the small DNN on the local edge, and the regions of the video frame that have low recognition confidence below a threshold will be offloaded to the cloud for inference with the large DNN model. The Edge node will not directly offload inference requests to the cloud.
+Edge-Local: Video frames received by an edge node are processed exclusively by that node.
 
-- Edge-Cloud-Threshold: When the length of the local inference queue on the edge node exceeds a specified threshold, the edge node will directly offload the video frame to the cloud.
+Edge-Shortest: Video frames are dispatched from an edge node to the edge node with the shortest inference queue. The selected edge node performs the inference.
+
+Shortest-Cloud-Threshold: If the local inference queue lengths of all edge nodes surpass a specified threshold, the edge node directly offloads the video frame to the cloud for inference. Otherwise, it is dispatched to the edge node with the shortest queue for inference. 
+
+Edge-Cloud-Assisted: Inference initially takes place on the edge node using a lightweight DNN. Regions of the video frame with low recognition confidence below a threshold are offloaded to the cloud for inference.
 
 **Step 2:** Start the cloud server.
 ```bash
