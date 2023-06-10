@@ -91,6 +91,7 @@ destinations: {'id': [1, 2, ...], 'ip':[ip1, ip2, ...]}
 ```
 
 **Deployed Model** 
+
 The models deployed on the edge node and the cloud can be configured by specifying model names. The pre-trained model directory is model_management/models.
 ```
 lightweight: fasterrcnn_mobilenet_v3_large_fpn 
@@ -121,13 +122,13 @@ Shortest-Cloud-Threshold: If the local inference queue lengths of all edge nodes
 
 Edge-Cloud-Assisted: Inference initially takes place on the edge node using a lightweight DNN. Regions of the video frame with low recognition confidence below a threshold are offloaded to the cloud for inference.
 
-**Step 2:** Start the cloud server.
+#### 2. Start the cloud server.
 ```bash
 cd ~/EdgeCam
 python3 cloud_server.py
 ```
 
-**Step 3:** Start the edge node.
+#### 3. Start the edge node.
 
 Please use the following command for each edge node.
 ```bash
