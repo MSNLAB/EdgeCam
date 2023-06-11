@@ -16,6 +16,22 @@ Firstly, for the video collected from on-edge camera, our system support a filte
 Then, our system have a decision engine to intelligently select offloading strategies for video frames, while adjusting their resolutions and encoding qualities adaptively.
 Moreover, EdgeCam implements continuous learning to enhance the accuracy of lightweight models on edge nodes, enabling them to handle data drift.
 
+The main implementation details of EdgeCam are shown below.
+
+<div align="center">
+<img src="./docs/modules.png" width="50%" height="50%">
+</div>
+
+| modules | Description |
+| :---: |    :----   |
+| Video Reader | Provides user-friendly interfaces for reading video streams using OpenCV. Supports offline video files and network cameras using the Real-Time Streaming Protocol (RTSP). | VideoProcessor |
+| Filter |  Aims to filter out the redundant video frames. Implements four methods to compute differences. | DiffProcessor |
+| Decision Engine | Encapsulates different offloading and video processing policies, each governing the workflow of video frames. | 
+| Standalone Worker | A thread that continuously extracts tasks from the local queue and then uses the locally deployed DNN model to perform inference.| 
+| Offloading Worker | Each offloading task will be assigned an offloading thread from the thread pool. The offloading thread dispatches the task to the corresponding edge server or offloads it to the cloud server.|
+| Drift Data Collector | Periodically selects a subset of video frames with lower average confidence in the predicted results from locally inferred frames. |
+| Model Retraining Worker | A thread that sends the selected frames for retraining to the cloud to get ground truth accuracy. Utilizes these frames and ground truth to retrain the current model.|
+| Request Handler | A thread that listens to the requests from the edge nodes.|
 
 
 ## Install
@@ -151,20 +167,6 @@ MIT License
 
 Copyright (c) 2023 Multimedia Systems and Networking Group
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+A copy of the license is available at the following link:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+https://opensource.org/license/mit/.
