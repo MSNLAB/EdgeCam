@@ -72,13 +72,14 @@ class EdgeWorker:
 
         # start the thread for retrain process
         self.collect_flag = self.config.retrain.flag
-        self.collect_time = None
+        self.collect_time = 0
+        self.last_collect_time = 0
         self.collect_time_flag = True
+        self.retrain_first = True
         self.retrain_flag = False
         self.cache_count = 0
 
         self.use_history = True
-        self.retrain_no = 0
 
         self.retrain_processor = threading.Thread(target=self.retrain_worker,daemon=True)
         self.retrain_processor.start()
@@ -179,13 +180,22 @@ class EdgeWorker:
             offloading_image, detection_boxes, detection_class, detection_score \
                 = self.small_object_detection.small_inference(current_frame)
 
+
+
             # collect data for retrain
-            if self.collect_flag:
+            if self.collect_flag and self.retrain_first:
                 if self.collect_time_flag:
-                    self.collect_time = time.time()
+                    self.last_collect_time = time.time()
                     self.collect_time_flag = False
-                duration = time.time() - self.collect_time
+                logger.debug("ctime L{}, {}".format(self.last_collect_time, self.collect_time))
+                self.collect_data(task, current_frame, detection_boxes, detection_class, detection_score)
+            elif self.collect_flag:
+                duration = time.time() - self.last_collect_time
+                logger.debug("duration {}, L{} {}".format(duration,self.last_collect_time, self.collect_time))
                 if duration > self.config.retrain.window:
+                    if self.collect_time_flag:
+                        self.collect_time = time.time()
+                        self.collect_time_flag = False
                     self.collect_data(task, current_frame ,detection_boxes, detection_class, detection_score)
 
             if detection_boxes is not None:
@@ -307,7 +317,6 @@ class EdgeWorker:
             self.avg_scores.append({task.frame_index: np.mean(detection_score)})
             self.cache_count += 1
             if self.cache_count >= self.config.retrain.collect_num:
-                self.retrain_no += 1
                 smallest_elements = sorted(self.avg_scores, key=lambda d: list(d.values())[0])[:self.config.retrain.select_num]
                 self.select_index = [list(d.keys())[0] for d in smallest_elements]
                 logger.debug("the select index {}".format(self.select_index))
@@ -349,6 +358,9 @@ class EdgeWorker:
                     self.select_index = []
                     self.avg_scores = []
                     self.annotations = []
+                if self.retrain_first == False:
+                    self.last_collect_time = self.collect_time
+                self.retrain_first = False
                 self.collect_time_flag = True
                 self.collect_flag = True
             time.sleep(0.2)
@@ -400,7 +412,7 @@ class EdgeWorker:
                     logger.info("could not connect to {}".format(destination_edge_ip))
                     self.local_queue.put(task, block=True)
 
-        elif policy == 'Shortest-Queue-Threshold':
+        elif policy == 'Shortest-Cloud-Threshold':
             queue_thresh = self.config.queue_thresh
             shortest_info = min(zip(self.queue_info.values(), self.queue_info.keys()))
             shortest_length = shortest_info[0]

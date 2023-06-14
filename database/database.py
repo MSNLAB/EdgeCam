@@ -10,6 +10,7 @@ from loguru import logger
 class DataBase:
     def __init__(self, config):
         self.cnx = mysql.connector.connect(**config.connection)
+        logger.debug(self.cnx.autocommit)
         self.database_name = config.database_name
         self.table_desc = "CREATE TABLE `{}` " \
                                  "(`index` int NOT NULL, " \
@@ -51,9 +52,10 @@ class DataBase:
                 logger.success("Database {} created successfully.".format(self.database_name))
                 self.cnx.database = self.database_name
             else:
+                cursor.close()
+                self.cnx.close()
                 logger.error(err)
                 exit(1)
-        cursor.close()
 
     def create_table(self, edge_ids):
         cursor = self.cnx.cursor()
@@ -68,10 +70,11 @@ class DataBase:
                     logger.info("already exists, drop it.")
                     cursor.execute(table_sql.format(id))
                 else:
+                    cursor.close()
+                    self.cnx.close()
                     logger.error(err.msg)
             else:
                 logger.success("create successfully")
-        cursor.close()
 
     def clear_table(self, edge_id):
         cursor = self.cnx.cursor()
@@ -79,9 +82,9 @@ class DataBase:
             cursor.execute("truncate table `{}`".format(edge_id))
         except mysql.connector.Error as err:
             cursor.close()
+            self.cnx.close()
             logger.error(err.msg)
         else:
-            cursor.close()
             logger.success("clear successfully")
 
 
@@ -94,9 +97,9 @@ class DataBase:
         except Exception as e:
             logger.error('Query failed {}'.format(e))
             cursor.close()
+            self.cnx.close()
             return None
         else:
-            cursor.close()
             logger.success('query successfully')
             return results
 
@@ -110,9 +113,9 @@ class DataBase:
         except Exception as e:
             logger.error('Query failed {}'.format(e))
             cursor.close()
+            self.cnx.close()
             return None
         else:
-            cursor.close()
             logger.success('query successfully')
             return result
 
@@ -123,12 +126,12 @@ class DataBase:
             cursor.execute(insert_sql, data)
             # Make sure data is committed to the database
             self.cnx.commit()
-
         except Exception as e:
+            self.cnx.rollback()
             cursor.close()
+            self.cnx.close()
             logger.error("insert error {}".format(e))
         else:
-            cursor.close()
             logger.success('insert successfully')
 
 
@@ -136,15 +139,17 @@ class DataBase:
         cursor = self.cnx.cursor()
         update_sql = self.update_desc.format(table_name)
         try:
+            self.cnx.start_transaction()
             cursor.execute(update_sql, data)
             # Make sure data is committed to the database
             self.cnx.commit()
 
         except Exception as e:
+            self.cnx.rollback()
             cursor.close()
+            self.cnx.close()
             logger.error("update error {}".format(e))
         else:
-            cursor.close()
             logger.success('update successfully')
 
 

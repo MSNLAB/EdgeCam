@@ -5,7 +5,6 @@ import threading
 import time
 
 
-import wandb
 import munch
 import yaml
 
@@ -30,7 +29,6 @@ if __name__ == '__main__':
         config = yaml.load(f, Loader=yaml.SafeLoader)
     #provide class-like access for dict
     config = munch.munchify(config)
-    wandb.init(project="filter", config=config)
     config = config.client
     signal.signal(signal.SIGINT, signal_handler)
     event = threading.Event()
