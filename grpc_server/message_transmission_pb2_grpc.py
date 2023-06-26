@@ -24,7 +24,7 @@ class MessageTransmissionStub(object):
                 request_serializer=message__transmission__pb2.InfoRequest.SerializeToString,
                 response_deserializer=message__transmission__pb2.InfoReply.FromString,
                 )
-        self.frame_processor = channel.unary_unary(
+        self.frame_processor = channel.stream_unary(
                 '/MessageTransmission/frame_processor',
                 request_serializer=message__transmission__pb2.FrameRequest.SerializeToString,
                 response_deserializer=message__transmission__pb2.FrameReply.FromString,
@@ -46,7 +46,7 @@ class MessageTransmissionServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def frame_processor(self, request, context):
+    def frame_processor(self, request_iterator, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -65,7 +65,7 @@ def add_MessageTransmissionServicer_to_server(servicer, server):
                     request_deserializer=message__transmission__pb2.InfoRequest.FromString,
                     response_serializer=message__transmission__pb2.InfoReply.SerializeToString,
             ),
-            'frame_processor': grpc.unary_unary_rpc_method_handler(
+            'frame_processor': grpc.stream_unary_rpc_method_handler(
                     servicer.frame_processor,
                     request_deserializer=message__transmission__pb2.FrameRequest.FromString,
                     response_serializer=message__transmission__pb2.FrameReply.SerializeToString,
@@ -115,7 +115,7 @@ class MessageTransmission(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def frame_processor(request,
+    def frame_processor(request_iterator,
             target,
             options=(),
             channel_credentials=None,
@@ -125,7 +125,7 @@ class MessageTransmission(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/MessageTransmission/frame_processor',
+        return grpc.experimental.stream_unary(request_iterator, target, '/MessageTransmission/frame_processor',
             message__transmission__pb2.FrameRequest.SerializeToString,
             message__transmission__pb2.FrameReply.FromString,
             options, channel_credentials,

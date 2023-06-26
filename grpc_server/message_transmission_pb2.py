@@ -13,7 +13,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1amessage_transmission.proto\"\xbb\x01\n\x0eMessageRequest\x12\x16\n\x0esource_edge_id\x18\x01 \x01(\x03\x12\x13\n\x0b\x66rame_index\x18\x02 \x01(\x03\x12\x12\n\nstart_time\x18\x03 \x01(\t\x12\r\n\x05\x66rame\x18\x04 \x01(\t\x12\x13\n\x0bpart_result\x18\x05 \x01(\t\x12\x11\n\traw_shape\x18\x06 \x01(\t\x12\x11\n\tnew_shape\x18\x07 \x01(\t\x12\x10\n\x08ref_list\x18\x08 \x01(\t\x12\x0c\n\x04note\x18\t \x01(\t\"N\n\x0cMessageReply\x12\x16\n\x0e\x64\x65stination_id\x18\x01 \x01(\x03\x12\x14\n\x0clocal_length\x18\x02 \x01(\x03\x12\x10\n\x08response\x18\x03 \x01(\t\"2\n\x0c\x46rameRequest\x12\r\n\x05\x66rame\x18\x01 \x01(\t\x12\x13\n\x0b\x66rame_shape\x18\x02 \x01(\t\"3\n\nFrameReply\x12\x10\n\x08response\x18\x01 \x01(\t\x12\x13\n\x0b\x66rame_shape\x18\x02 \x01(\t\";\n\x0bInfoRequest\x12\x16\n\x0esource_edge_id\x18\x01 \x01(\x03\x12\x14\n\x0clocal_length\x18\x02 \x01(\x03\"9\n\tInfoReply\x12\x16\n\x0e\x64\x65stination_id\x18\x01 \x01(\x03\x12\x14\n\x0clocal_length\x18\x02 \x01(\x03\x32\xa8\x01\n\x13MessageTransmission\x12\x32\n\x0etask_processor\x12\x0f.MessageRequest\x1a\r.MessageReply\"\x00\x12,\n\x0eget_queue_info\x12\x0c.InfoRequest\x1a\n.InfoReply\"\x00\x12/\n\x0f\x66rame_processor\x12\r.FrameRequest\x1a\x0b.FrameReply\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1amessage_transmission.proto\"\xbb\x01\n\x0eMessageRequest\x12\x16\n\x0esource_edge_id\x18\x01 \x01(\x03\x12\x13\n\x0b\x66rame_index\x18\x02 \x01(\x03\x12\x12\n\nstart_time\x18\x03 \x01(\t\x12\r\n\x05\x66rame\x18\x04 \x01(\t\x12\x13\n\x0bpart_result\x18\x05 \x01(\t\x12\x11\n\traw_shape\x18\x06 \x01(\t\x12\x11\n\tnew_shape\x18\x07 \x01(\t\x12\x10\n\x08ref_list\x18\x08 \x01(\t\x12\x0c\n\x04note\x18\t \x01(\t\"N\n\x0cMessageReply\x12\x16\n\x0e\x64\x65stination_id\x18\x01 \x01(\x03\x12\x14\n\x0clocal_length\x18\x02 \x01(\x03\x12\x10\n\x08response\x18\x03 \x01(\t\"G\n\x0c\x46rameRequest\x12\r\n\x05\x66rame\x18\x01 \x01(\t\x12\x13\n\x0b\x66rame_shape\x18\x02 \x01(\t\x12\x13\n\x0b\x66rame_index\x18\x03 \x01(\x03\"3\n\nFrameReply\x12\x10\n\x08response\x18\x01 \x01(\t\x12\x13\n\x0b\x66rame_shape\x18\x02 \x01(\t\";\n\x0bInfoRequest\x12\x16\n\x0esource_edge_id\x18\x01 \x01(\x03\x12\x14\n\x0clocal_length\x18\x02 \x01(\x03\"9\n\tInfoReply\x12\x16\n\x0e\x64\x65stination_id\x18\x01 \x01(\x03\x12\x14\n\x0clocal_length\x18\x02 \x01(\x03\x32\xaa\x01\n\x13MessageTransmission\x12\x32\n\x0etask_processor\x12\x0f.MessageRequest\x1a\r.MessageReply\"\x00\x12,\n\x0eget_queue_info\x12\x0c.InfoRequest\x1a\n.InfoReply\"\x00\x12\x31\n\x0f\x66rame_processor\x12\r.FrameRequest\x1a\x0b.FrameReply\"\x00(\x01\x62\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'message_transmission_pb2', globals())
@@ -25,13 +25,13 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _MESSAGEREPLY._serialized_start=220
   _MESSAGEREPLY._serialized_end=298
   _FRAMEREQUEST._serialized_start=300
-  _FRAMEREQUEST._serialized_end=350
-  _FRAMEREPLY._serialized_start=352
-  _FRAMEREPLY._serialized_end=403
-  _INFOREQUEST._serialized_start=405
-  _INFOREQUEST._serialized_end=464
-  _INFOREPLY._serialized_start=466
-  _INFOREPLY._serialized_end=523
-  _MESSAGETRANSMISSION._serialized_start=526
-  _MESSAGETRANSMISSION._serialized_end=694
+  _FRAMEREQUEST._serialized_end=371
+  _FRAMEREPLY._serialized_start=373
+  _FRAMEREPLY._serialized_end=424
+  _INFOREQUEST._serialized_start=426
+  _INFOREQUEST._serialized_end=485
+  _INFOREPLY._serialized_start=487
+  _INFOREPLY._serialized_end=544
+  _MESSAGETRANSMISSION._serialized_start=547
+  _MESSAGETRANSMISSION._serialized_end=717
 # @@protoc_insertion_point(module_scope)

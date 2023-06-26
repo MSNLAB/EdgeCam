@@ -13,12 +13,14 @@ class FrameReply(_message.Message):
     def __init__(self, response: _Optional[str] = ..., frame_shape: _Optional[str] = ...) -> None: ...
 
 class FrameRequest(_message.Message):
-    __slots__ = ["frame", "frame_shape"]
+    __slots__ = ["frame", "frame_index", "frame_shape"]
     FRAME_FIELD_NUMBER: _ClassVar[int]
+    FRAME_INDEX_FIELD_NUMBER: _ClassVar[int]
     FRAME_SHAPE_FIELD_NUMBER: _ClassVar[int]
     frame: str
+    frame_index: int
     frame_shape: str
-    def __init__(self, frame: _Optional[str] = ..., frame_shape: _Optional[str] = ...) -> None: ...
+    def __init__(self, frame: _Optional[str] = ..., frame_shape: _Optional[str] = ..., frame_index: _Optional[int] = ...) -> None: ...
 
 class InfoReply(_message.Message):
     __slots__ = ["destination_id", "local_length"]

@@ -3,7 +3,7 @@ syntax = "proto3";
 service MessageTransmission {
   rpc task_processor (MessageRequest) returns (MessageReply) {}
   rpc get_queue_info (InfoRequest) returns (InfoReply) {}
-  rpc frame_processor (FrameRequest) returns (FrameReply) {}
+  rpc frame_processor (stream FrameRequest) returns (FrameReply) {}
 }
 
 message MessageRequest {
@@ -28,6 +28,7 @@ message MessageReply {
 message FrameRequest{
     string frame = 1;
     string frame_shape = 2;
+    int64 frame_index = 3;
 }
 
 message FrameReply{

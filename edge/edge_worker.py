@@ -331,14 +331,11 @@ class EdgeWorker:
         self.annotations = []
         while True:
             if self.retrain_flag:
-                logger.debug("retrain")
-                for index in self.select_index:
-                    path = os.path.join(self.config.retrain.cache_path, 'frames', '{}.jpg'.format(index))
-                    logger.debug(path)
-                    frame = cv2.imread(path)
-                    target_res = get_cloud_target(self.config.server_ip, frame)
-                    for score, label, box in zip(target_res['scores'], target_res['labels'], target_res['boxes']):
-                        self.annotations.append((index, label, box[0], box[1], box[2], box[3], score))
+                logger.info("retrain")
+                res_list = get_cloud_target(self.config.server_ip, self.select_index, self.config.retrain.cache_path)
+                for res in res_list:
+                    for score, label, box in zip(res['scores'], res['labels'], res['boxes']):
+                        self.annotations.append((res['index'], label, box[0], box[1], box[2], box[3], score))
                 if len(self.annotations):
                     np.savetxt(os.path.join(self.config.retrain.cache_path,'annotation.txt'), self.annotations,
                                fmt=['%d', '%d', '%f', '%f', '%f', '%f', '%f'], delimiter=',')

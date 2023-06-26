@@ -41,20 +41,26 @@ class MessageTransmissionServicer(message_transmission_pb2_grpc.MessageTransmiss
 
         return reply
 
-    def frame_processor(self, request, context):
-        base64_frame = request.frame
-        frame_shape = tuple(int(s) for s in request.frame_shape[1:-1].split(","))
-        frame = base64_to_cv2(base64_frame).reshape(frame_shape)
-        pred_boxes, pred_class, pred_score = self.object_detection.large_inference(frame)
-        res = {
-            'boxes': pred_boxes,
-            'labels': pred_class,
-            'scores': pred_score
-        }
+    def frame_processor(self, request_iterator, context):
+        res_list = []
+        for request in request_iterator:
+            base64_frame = request.frame
+            frame_shape = tuple(int(s) for s in request.frame_shape[1:-1].split(","))
+            frame = base64_to_cv2(base64_frame).reshape(frame_shape)
+            index = request.frame_index
+            pred_boxes, pred_class, pred_score = self.object_detection.large_inference(frame)
+            res = {
+                'index': index,
+                'boxes': pred_boxes,
+                'labels': pred_class,
+                'scores': pred_score
+            }
+            res_list.append(res)
         reply = message_transmission_pb2.FrameReply(
-            response=str(res),
+            response=str(res_list),
             frame_shape=str(frame_shape),
         )
+        logger.debug(reply)
         return reply
 
 
